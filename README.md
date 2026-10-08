@@ -15,13 +15,14 @@ Coloured hospital beds are jammed in the corridor. Tap one to roll it out the wa
 
 ## Between shifts
 
-Every shift is followed by a minigame, in rotation: Call Light Frenzy, Emergency Rush, Code Blue, Med Pass. Each has a start page that shows what to grab and what to avoid, can be skipped, and pays a +1,000 bonus on a clean run.
+Every shift is followed by a minigame, in rotation: Call Light Frenzy, Emergency Rush, Code Blue, Med Pass, Group Hangout. Each has a start page that shows what to grab and what to avoid, can be skipped, and pays a +1,000 bonus on a clean run.
 
 - **Call Light Frenzy:** nine rooms, call lights going off. Tap red (real) calls before they time out; white ones (blankets, jello, wifi) and the doctor's favours just cost time. Three missed calls ends it.
 - **Code Blue:** a rhythm game. Tap on the beat to do compressions (100-120 bpm, synced to the audio clock), tap the bolt to shock. 90% on the beat is a clean run.
+- **Group Hangout:** tap each nurse to hear their 5-7 free dates (random order), then tap the one date everyone shares on the calendar. Two guesses, 60 seconds; a wrong guess tells you who can't make it. The generator guarantees exactly one common date and adds near-miss dates that all but one nurse share.
 - **Med Pass:** drag the med cup to catch the pills on the order card, which changes per patient. Tylenol is always fine; anything else is a wrong med, and three ends it.
 
-Once or twice a shift (from shift 2) a surprise break pauses play: **Coffee Pour** (hold to pour, let go on the line, three mugs) or **Pizza Defense** (slap day shift's hands away from the pizza, but not the manager's, who brings more). Break points go to the current shift. `?mini=calls|cpr|meds|coffee|pizza` jumps straight into one. Code is in `js/minis.js`.
+Once or twice a shift (from shift 2) a surprise break pauses play: **Coffee Pour** (hold to pour, let go on the line, three mugs) or **Pizza Defense** (slap day shift's hands away from the pizza, but not the manager's, who brings more). Break points go to the current shift. `?mini=calls|cpr|meds|hangout|coffee|pizza` jumps straight into one. Code is in `js/minis.js`.
 
 ## Emergency Rush
 

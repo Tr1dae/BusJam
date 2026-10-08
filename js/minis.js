@@ -14,7 +14,7 @@ const Minis = (() => {
   // top bar: lives, score, and a timer bar
   function hud(m, left) {
     R(0, 0, LW, 13, 'rgba(20,24,36,.6)');
-    if (m.lives != null) for (let i = 0; i < 3; i++) heart(4 + i * 10, 3, i < m.lives);
+    if (m.lives != null) for (let i = 0; i < (m.maxLives || 3); i++) heart(4 + i * 10, 3, i < m.lives);
     Font.bigCentered(ctx, fmt(m.score), 97, 3, '#fff', 1, K);
     if (left != null) { const w = LW - 16; R(8, 15, w, 3, 'rgba(20,24,36,.45)'); R(8, 15, Math.round(w * Math.max(0, left)), 3, left < 0.2 ? '#ff4d4d' : '#4ade80'); }
   }
@@ -430,8 +430,90 @@ const Minis = (() => {
     },
   };
 
-  const GAMES = { calls, cpr, meds, coffee, pizza };
-  const ROTATION = ['calls', 'rush', 'cpr', 'meds'];
+  // ======================= GROUP HANGOUT (find the date that suits everyone) =======================
+  const CREW = ['Becca', 'Sarah', 'Jess', 'Carly', 'Katrina', 'Jann', 'Angela', 'Sophie'];
+  const EXCUSES = ["I'M ON NIGHTS.", 'DENTIST. SORRY.', 'PICKING UP OT.', "I'LL BE ASLEEP.", 'MAYBE? (NO.)', 'MY KID HAS A RECITAL.', "THAT'S MY ONE DAY OFF.", 'MANDATORY TRAINING.', 'IN-LAWS. HELP.'];
+  const crewHair = n => (typeof HAIR !== 'undefined' && HAIR[n]) || ['#4f3322', '#38231a'];
+  const hangout = {
+    title: 'GROUP HANGOUT', head: '#ff7eb6', song: 'break',
+    blurb: 'Plan a night out with the crew. Everyone works different shifts. Find the one date that every nurse is free.',
+    rows: [
+      [(x, y) => putC(Sprites.staff('nurse', crewHair('Sarah'), 0, false), x, y + 9, 0.9), 'TAP A NURSE', 'THEY TELL YOU THEIR FREE DATES', '#b5427e'],
+      [(x, y) => { R(x - 8, y - 7, 16, 14, K); R(x - 7, y - 6, 14, 12, '#fff'); Font.smallCentered(ctx, '14', x, y - 2, '#334155'); }, 'TAP THE DATE THAT WORKS', 'ON THE CALENDAR AT THE BOTTOM', '#2e8a5f'],
+      [(x, y) => { heart(x - 9, y - 3, true); heart(x + 2, y - 3, true); }, 'TWO GUESSES', 'THE CLOCK IS TICKING TOO', '#c0392b'],
+    ],
+    goal: 'FIRST GUESS RIGHT = +1,000 BONUS',
+    init(m) {
+      m.dur = 60; m.lives = 2; m.maxLives = 2; m.days = 30; m.start = Math.floor(Math.random() * 5); m.sel = -1; m.selT = 0; m.asked = new Set(); m.guesses = []; m.say = null;
+      m.month = one(['JUNE', 'SEPTEMBER', 'NOVEMBER', 'APRIL']);
+      for (let tries = 0; tries < 200; tries++) {
+        const days = [...Array(m.days).keys()].map(d => d + 1).sort(() => Math.random() - 0.5), D = days[0];
+        const decoys = days.slice(1, 3 + Math.min(3, Math.floor(m.shift / 4)));
+        const left = CREW.slice().sort(() => Math.random() - 0.5);
+        const sets = CREW.map(() => new Set([D]));
+        decoys.forEach((d, i) => CREW.forEach((n, k) => { if (n !== left[i % left.length]) sets[k].add(d); }));
+        const filler = days.slice(1).filter(d => !decoys.includes(d));
+        sets.forEach(s => { const want = 5 + Math.floor(Math.random() * 3); for (const d of filler.slice().sort(() => Math.random() - 0.5)) { if (s.size >= want) break; s.add(d); } });
+        const common = days.filter(d => sets.every(s => s.has(d)));
+        if (common.length === 1 && sets.every(s => s.size >= 5 && s.size <= 7)) { m.answer = D; m.free = sets.map(s => [...s].sort(() => Math.random() - 0.5)); break; }
+      }
+    },
+    nurseCell(i) { const top = 22, h = Math.round((LH - 22 - 168) / 2); return { x: 2 + (i % 4) * 48, y: top + Math.floor(i / 4) * h, w: 47, h }; },
+    calTop: () => LH - 128,
+    dayCell(d) { const idx = d - 1 + M.start; return { x: 6 + (idx % 7) * 26, y: hangout.calTop() + 18 + Math.floor(idx / 7) * 21, w: 25, h: 20 }; },
+    update(m, dt) { m.selT += dt; if (m.t >= m.dur && !m.done) { m.say = { name: 'GROUP CHAT', text: 'EVERYONE LEFT THE CHAT.' }; end(m, 'lose'); } },
+    down(m, p) {
+      for (let i = 0; i < CREW.length; i++) { const c = hangout.nurseCell(i);
+        if (p.x >= c.x && p.x < c.x + c.w && p.y >= c.y && p.y < c.y + c.h) { m.sel = i; m.selT = 0; m.asked.add(i); m.free[i].sort(() => Math.random() - 0.5); m.say = null; Sound.sfx.blip(700 + i * 40); return; } }
+      for (let d = 1; d <= m.days; d++) { const c = hangout.dayCell(d);
+        if (p.x >= c.x && p.x < c.x + c.w && p.y >= c.y && p.y < c.y + c.h) {
+          if (m.guesses.includes(d)) return;
+          m.guesses.push(d);
+          if (d === m.answer) { const pts = (m.guesses.length === 1 ? 800 : 400) + Math.max(0, Math.round((m.dur - m.t) * 15)); m.score += pts; pop('+' + fmt(pts), c.x + 12, c.y - 4);
+            m.say = { name: 'EVERYONE', text: "IT'S A DATE! (TWO WILL CANCEL.)" }; sparkle(c.x + 12, c.y + 10, 14, ['#ffe066', '#fff', '#ff7eb6']); end(m, 'win'); }
+          else { const k = m.free.findIndex(s => !s.includes(d)); m.lives--; m.say = { name: CREW[k], text: one(EXCUSES) }; m.sel = -1;
+            Sound.sfx.nope(); buzz(50); shakeScreen(0.2, 1.5); if (m.lives <= 0) end(m, 'lose'); }
+          return; } }
+    },
+    draw(m) {
+      R(0, 0, LW, LH, '#fdf0f5'); for (let y = 16; y < LH - 130; y += 12) for (let x = (y / 12 % 2) * 12; x < LW; x += 24) R(x, y, 2, 2, '#f6dce8');
+      // the crew
+      CREW.forEach((n, i) => {
+        const c = hangout.nurseCell(i), img = Sprites.staff('nurse', crewHair(n), 0, i % 2 === 1), sel = m.sel === i, bob = sel ? Math.round(Math.abs(Math.sin(m.selT * 8)) * -2) : 0;
+        if (sel) { R(c.x + 2, c.y + 2, c.w - 4, c.h - 4, '#ffd6e8'); }
+        ellipse(c.x + c.w / 2, c.y + c.h - 13, 11, 2, 'rgba(20,24,36,.2)');
+        const k = c.h >= 100 ? 3 : 2; putC(img, c.x + c.w / 2, c.y + c.h - 12 + bob, k);
+        const tw = Font.smallWidth(n.toUpperCase()) + 6, tx = Math.round(c.x + c.w / 2 - tw / 2), ty = c.y + c.h - 10;
+        R(tx - 1, ty - 1, tw + 2, 9, K); R(tx, ty, tw, 7, m.asked.has(i) ? '#fff' : '#ffe066'); Font.small(ctx, n.toUpperCase(), tx + 3, ty + 1, K);
+        if (!m.asked.has(i) && Math.floor(T * 2 + i) % 2) Font.bigCentered(ctx, '?', c.x + c.w - 6, c.y + c.h - 12 - img.height * k - 4, '#b5427e', 1, '#fff');
+      });
+      // chat box with whoever is talking
+      const by = hangout.calTop() - 40;
+      R(5, by - 1, LW - 10, 36, K); R(6, by, LW - 12, 34, '#fff');
+      if (m.say) { Font.small(ctx, m.say.name.toUpperCase() + ':', 10, by + 4, '#b5427e'); if (Font.bigWidth(m.say.text) <= LW - 20) Font.bigCentered(ctx, m.say.text, 97, by + 18, '#334155', 1); else Font.smallCentered(ctx, m.say.text, 97, by + 19, '#334155'); }
+      else if (m.sel >= 0) {
+        Font.small(ctx, CREW[m.sel].toUpperCase() + ": I'M FREE ON THE...", 10, by + 4, '#b5427e');
+        Font.bigCentered(ctx, m.free[m.sel].join(' '), 97, by + 17, '#334155', m.free[m.sel].join(' ').length * 12 <= LW - 20 ? 2 : 1);
+      } else Font.smallCentered(ctx, 'TAP A NURSE TO ASK WHEN THEY ARE FREE', 97, by + 14, '#94a3b8');
+      // calendar
+      const ct = hangout.calTop();
+      R(4, ct - 1, LW - 8, 128, K); R(5, ct, LW - 10, 126, '#fff'); R(5, ct, LW - 10, 9, '#ff7eb6'); Font.smallCentered(ctx, m.month, 97, ct + 2, '#fff');
+      'SMTWTFS'.split('').forEach((d, i) => Font.small(ctx, d, 6 + i * 26 + 11, ct + 11, i === 0 || i === 6 ? '#b5427e' : '#94a3b8'));
+      for (let d = 1; d <= m.days; d++) {
+        const c = hangout.dayCell(d), wk = ((d - 1 + m.start) % 7), g = m.guesses.includes(d), right = g && d === m.answer;
+        R(c.x, c.y, c.w - 1, c.h - 1, right ? '#c9ffd9' : g ? '#ffe1e1' : wk === 0 || wk === 6 ? '#fff4f9' : '#f4f6f9');
+        Font.bigCentered(ctx, String(d), c.x + 12, c.y + 6, g && !right ? '#c0392b' : '#334155', 1);
+        if (g && !right) for (let k = 0; k < 14; k++) { R(c.x + 5 + k, c.y + 3 + k, 1, 1, '#e8424f'); R(c.x + 18 - k, c.y + 3 + k, 1, 1, '#e8424f'); }
+        if (right) { for (let a = 0; a < 40; a++) R(Math.round(c.x + 12 + Math.cos(a / 40 * 6.283) * 11), Math.round(c.y + 9 + Math.sin(a / 40 * 6.283) * 9), 1, 1, '#22a35a'); }
+      }
+      hud(m, 1 - m.t / m.dur);
+    },
+    stats: m => ['GUESSES ' + m.guesses.length + '   TIME ' + Math.round(m.t) + 'S', m.done === 'win' && m.guesses.length === 1],
+    endTitle: m => m.done === 'win' ? "IT'S A DATE!" : 'GROUP CHAT DIED',
+  };
+
+  const GAMES = { calls, cpr, meds, hangout, coffee, pizza };
+  const ROTATION = ['calls', 'rush', 'cpr', 'meds', 'hangout'];
 
   // ---------- framework ----------
   function begin(kind, shift, mode) {
