@@ -295,6 +295,56 @@ function cameoTap(p) {
   Sound.sfx.click(); return true;
 }
 
+// ---------- escaped patient: now and then someone gets loose in the bed park ----------
+const ESCAPE_LINES = ['WHERE ARE MY PANTS?', "I'M THE CAPTAIN NOW!", 'THE PIGEONS KNOW!', 'IS THIS THE BUS TO 1987?', 'I HAVE TO FEED MY HORSE!',
+  "YOU'RE NOT MY MOM!", 'I CAN HEAR COLOURS!', 'THE JELLO IS WATCHING ME!', "I'M LATE FOR MY WEDDING!", 'WHO TOOK MY TEETH?', 'FREEDOM!',
+  'THE WIFI IS IN MY FILLINGS!', 'I WANT TO SPEAK TO THE MANAGER!', 'I WAS PROMISED A PONY!', 'THIS IS NOT A GOWN, IT IS A CAPE!',
+  "I'M NOT CONFUSED, YOU'RE CONFUSED!", 'TELL MY CAT I LOVE HER!', 'I AM A GOLDEN GOD!', 'NOBODY SAW ANYTHING!', 'WHICH WAY TO THE BEACH?'];
+const ESCAPE_TIME = 22;
+function scheduleEscape(n) { return n >= 2 && Math.random() < 0.28 ? 15 + Math.random() * 55 : null; }
+const escTarget = () => ({ x: 14 + Math.random() * (LW - 28), y: LOT_TOP + 16 + Math.random() * (LH - LOT_TOP - 30) });
+function updateEscape(dt) {
+  if (G.escAt != null && !G.escape && !G.over && G.playT >= G.escAt) {
+    G.escAt = null; const side = Math.random() < 0.5, to = escTarget();
+    G.escape = { x: side ? -10 : LW + 10, y: LOT_TOP + 30 + Math.random() * 60, tx: to.x, ty: to.y, dept: pick(DEPTS), t: 0, stop: 0, say: null, left: !side, caught: 0 };
+    Sound.sfx.startle(); flash('A PATIENT GOT LOOSE! TAP THEM!');
+  }
+  const e = G.escape; if (!e) return;
+  e.t += dt;
+  if (e.caught) { e.caught += dt; if (e.caught > 0.7) G.escape = null; return; }
+  if (e.say) { e.say.t += dt; if (e.say.t > 1.8) e.say = null; }
+  if (e.t > ESCAPE_TIME && !e.leaving) { e.leaving = true; e.tx = e.x < LW / 2 ? -20 : LW + 20; e.ty = e.y; e.say = { text: "I'M LEAVING AMA!", t: 0 }; }
+  if (e.stop > 0) { e.stop -= dt; return; }
+  const dx = e.tx - e.x, dy = e.ty - e.y, d = Math.hypot(dx, dy), sp = e.leaving ? 70 : 46;
+  if (d < 2) {
+    if (e.leaving) { G.escape = null; addScore(-200, 97, LOT_TOP + 20, true); Sound.sfx.nope(); flash('THEY LEFT AMA. -200'); return; }
+    if (Math.random() < 0.45) { e.stop = 1.6; e.say = { text: pick(ESCAPE_LINES), t: 0 }; Sound.sfx.blip(420); }
+    const to = escTarget(); e.tx = to.x; e.ty = to.y;
+  } else { e.x += dx / d * Math.min(d, sp * dt); e.y += dy / d * Math.min(d, sp * dt); e.left = dx < 0; }
+  if (Math.random() < dt * 4) puff(e.x, e.y + 8, 1);
+}
+function drawEscape() {
+  const e = G.escape; if (!e) return;
+  const x = Math.round(e.x), y = Math.round(e.y), run = e.stop <= 0 && !e.caught;
+  if (e.caught) { const u = Math.min(1, e.caught / 0.5); ctx.globalAlpha = 1 - u; }
+  ellipse(x, y + 10, 6, 2, 'rgba(20,24,36,.3)');
+  // the IV pole gets dragged along behind
+  const img = Sprites.patient(e.dept, run ? Math.floor(T * 12) % 4 : 0, Math.floor(T * 4) % 2, e.left), hop = run ? Math.abs(Math.round(Math.sin(T * 18) * 2)) : 0;
+  const px = x + (e.left ? 1 : -1) * (img.width + 3), py = y + 10;
+  R(px, py - 26, 1, 26, '#9aa3b2'); R(px - 4, py - 27, 9, 1, '#9aa3b2'); R(px - 3, py - 26, 4, 7, K); R(px - 2, py - 25, 2, 5, '#cfe9f7');
+  R(px - 4, py - 1, 9, 2, '#6c7484'); R(px - 4, py + 1, 2, 1, K); R(px + 3, py + 1, 2, 1, K); R(px + (e.left ? -2 : 1), py - 18, 2, 1, '#9aa3b2');
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(img, x - img.width, y + 10 - img.height * 2 - hop, img.width * 2, img.height * 2);
+  ctx.globalAlpha = 1;
+  if (!e.caught && Math.floor(T * 3) % 2) Font.bigCentered(ctx, '!', x + (e.left ? -10 : 10), y - img.height * 2 + 4, '#ff4d4d', 1, '#fff');
+  if (e.say && !e.caught) { const w = Font.smallWidth(e.say.text) + 6, bx = Math.max(2, Math.min(LW - w - 2, x - w / 2)), by = Math.max(LOT_TOP + 2, y - img.height * 2 - 4);
+    badge(Math.round(bx), by, w, 9, '#fff'); R(x - 1, by + 9, 3, 2, '#fff'); Font.small(ctx, e.say.text, Math.round(bx) + 3, by + 2, '#334155'); }
+}
+function escapeTap(p) {
+  const e = G && G.escape; if (!e || e.caught || Math.hypot(p.x - e.x, p.y - (e.y - 4)) > 16) return false;
+  e.caught = 0.01; e.say = null; addScore(300, e.x, e.y - 30, true); Sound.sfx.bonus(); buzz(30);
+  sparkle(e.x, e.y - 6, 14, ['#ffe066', '#fff', e.dept.L]); flash(pick(['BACK TO BED!', 'GOTCHA. BED. NOW.', 'NICE TACKLE!', 'RETURNED TO SENDER.'])); return true;
+}
+
 // ---------- state ----------
 let screen = 'splash', G = null, T = 0, toast = null, buttons = [], overlayT = 0;
 let level = 1;
@@ -306,7 +356,7 @@ function startLevel(n) {
   level = n; try { localStorage.setItem('aj.level', n); } catch (e) {}
   const gen = generateLevel(n, LOT, tries);
   G = { n, cfg: gen.cfg, vehicles: gen.vehicles, offset: 0, rows: [], funnels: [], bays: [], open: gen.cfg.open ?? OPEN, score: 0, shown: 0, floats: [], bonus: 0,
-        flyers: [], pops: [], over: null, moves: 0, blurb: pick(BLURBS), endLine: '', playT: 0, cameos: scheduleCameos(), cameo: null, leavers: [], breaks: Minis.scheduleBreaks(n) };
+        flyers: [], pops: [], over: null, moves: 0, blurb: pick(BLURBS), endLine: '', playT: 0, cameos: scheduleCameos(), cameo: null, leavers: [], breaks: Minis.scheduleBreaks(n), escAt: scheduleEscape(n), escape: null };
   for (const v of G.vehicles) { v.state = 'lot'; v.px = v.x; v.py = v.y; v.revealed = !v.mystery; v.bumpT = 0; v.shake = 0; v.flipAnim = 0; }
   for (let i = 0; i < SLOTS; i++) G.bays.push({ state: 'empty', t: 0 });
   // fill loop rows in the order they will reach the door, the rest wait in the funnels
@@ -406,7 +456,7 @@ function update(dt) {
     G.floats.forEach(f => { f.t += dt; f.y -= 14 * dt; }); G.floats = G.floats.filter(f => f.t < 1.4); }
   updateFx(dt);
   if (!G || screen !== 'play') return;
-  updateCameo(dt);
+  updateCameo(dt); updateEscape(dt);
   // a surprise break pauses the shift (never mid-cameo or once the shift is decided)
   const brk = G.breaks[0];
   if (brk && G.playT >= brk.at && !G.over && !G.cameo) { G.breaks.shift(); Minis.begin(brk.kind, G.n, 'break'); return; }
@@ -868,6 +918,7 @@ function drawPlay() {
   drawFx();
   for (const p of G.pops) { ctx.globalAlpha = p.t < 0.7 ? 1 : Math.max(0, 1 - (p.t - 0.7) / 0.2); blit(Sprites.icon(p.dept), p.x, p.y); ctx.globalAlpha = 1; }
   for (const f of G.floats) { ctx.globalAlpha = f.t < 1 ? 1 : Math.max(0, 1 - (f.t - 1) / 0.4); Font.bigCentered(ctx, f.text, Math.round(f.x), Math.round(f.y), f.col, 1, K); ctx.globalAlpha = 1; }
+  drawEscape();
   drawCameo();
   drawHud();
   if (toast && toast.t > 0) { const w = Font.smallWidth(toast.msg) + 10; badge(Math.round(97 - w / 2), BAY_Y + BAY_H + 10, w, 11, '#334155'); Font.small(ctx, toast.msg, Math.round(97 - w / 2) + 5, BAY_Y + BAY_H + 13, '#fff'); }
@@ -994,6 +1045,7 @@ cv.addEventListener('pointerdown', e => {
   if (screen === 'mini') { Minis.down(p); return; }
   if (screen !== 'play' || G.over) return;
   if (cameoTap(p)) return;
+  if (escapeTap(p)) return;
   if (p.y < LOT_TOP - 4) taps.push({ x: p.x, y: p.y, t: 0 });
   const dec = decorAt(p.x, p.y);
   if (dec) { if (T - dec.tap > 0.3) { dec.tap = T; DECOR_SFX[dec.id](); if (dec.id === 'plant') leaf(dec.x + 10, dec.y + 10); if (dec.id === 'coffee') puff(dec.x + 13, dec.y + 4, 5); } return; }

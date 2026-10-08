@@ -523,7 +523,17 @@ const Minis = (() => {
     const g = GAMES[kind]; M = { kind, g, mode: mode || (g.isBreak ? 'break' : 'between'), shift, t: 0, score: 0, done: null, endT: 0, pops: [], lives: null };
     g.init(M); screen = 'miniIntro'; overlayT = 0;
   }
-  function between(n) { const k = ROTATION[(n - 1) % ROTATION.length]; if (k === 'rush') { M = null; Rush.begin(n); } else begin(k, n, 'between'); }
+  // which game comes next: a shuffled bag (so you see them all), reshuffled at random each round and never the same twice in a row
+  function nextGame() {
+    let bag = [], last = null;
+    try { bag = JSON.parse(localStorage.getItem('aj.minibag') || '[]').filter(k => ROTATION.includes(k)); last = localStorage.getItem('aj.minilast'); } catch (e) {}
+    if (!bag.length) { bag = ROTATION.slice(); for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+      if (bag[0] === last) bag.push(bag.shift()); }
+    const k = bag.shift();
+    try { localStorage.setItem('aj.minibag', JSON.stringify(bag)); localStorage.setItem('aj.minilast', k); } catch (e) {}
+    return k;
+  }
+  function between(n) { const k = nextGame(); if (k === 'rush') { M = null; Rush.begin(n); } else begin(k, n, 'between'); }
   function go() { Sound.sfx.start(); Sound.play(M.g.song || 'rush'); if (M.g.start) M.g.start(M); screen = 'mini'; overlayT = 0; }
   function end(m, how) { if (m.done) return; m.done = how; m.endT = 0; if (!m.g.isBreak && m.g.stats(m)[1]) m.score += 1000; if (how === 'lose') Sound.sfx.lose(); else if (!m.g.isBreak && m.kind !== 'cpr') { Sound.sfx.win(); dropConfetti(30, true); } }
   function update(dt) {

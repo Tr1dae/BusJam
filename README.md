@@ -11,11 +11,12 @@ Coloured hospital beds are jammed in the corridor. Tap one to roll it out the wa
 - **Difficulty:** shift 1 is a tutorial. From shift 2 the first patients belong to beds buried deep in the jam (more of them later on), only so many rows fit on the loop at once (the rest queue at the sides), patient blocks are shuffled away from the order beds can get out, departments ramp up faster, more beds are packed in, more and more beds face back into the jam (each with about `depth` beds in its way), and some beds lie crosswise across the others' roads. All in `levelConfig` (`buried`, `window`, `scatter`, `depts`, `vehicles`, `inward`, `depth`, `cross`). Retrying a shift deals a fresh layout.
 - **Porters:** in the jam beds are drawn flat from above; once a bed starts moving it's lifted onto its frame with legs and castors and a porter in blue scrubs pushes it from the head end, including while it's parked (diagonally) in a bay.
 - **Bays free up instantly:** as soon as a bed fills, its bay is free for the next bed while the full one reverses out.
+- **Escaped patient:** from shift 2, roughly one shift in four, a confused patient drags their IV pole round the bed park yelling nonsense. Tap them for +300; leave them 22 seconds and they leave AMA (-200).
 - **Bays and score:** 3 bays are open and 3 are locked. Opening them costs 500, then 1,000, then 1,500 points; any left locked at the end of a shift are worth +500 each. Patients score 10 each, departures 5 per seat, a cleared shift 1,000, and the career total is saved.
 
 ## Between shifts
 
-Every shift is followed by a minigame, in rotation: Call Light Frenzy, Emergency Rush, Code Blue, Med Pass, Group Hangout. Each has a start page that shows what to grab and what to avoid, can be skipped, and pays a +1,000 bonus on a clean run.
+Every shift is followed by a random minigame (Call Light Frenzy, Emergency Rush, Code Blue, Med Pass, Group Hangout): a shuffled bag kept in the browser, so you see all five before any repeats, and never the same one twice in a row. Each has a start page that shows what to grab and what to avoid, can be skipped, and pays a +1,000 bonus on a clean run.
 
 - **Call Light Frenzy:** nine rooms, call lights going off. Tap red (real) calls before they time out; white ones (blankets, jello, wifi) and the doctor's favours just cost time. Three missed calls ends it.
 - **Code Blue:** a rhythm game. Tap on the beat to do compressions (100-120 bpm, synced to the audio clock), tap the bolt to shock. 90% on the beat is a clean run.
