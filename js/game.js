@@ -767,6 +767,7 @@ function drawSplash() {
     R(x, y, 6, 3, '#fff'); R(x + 4, y - 2, 3, 3, '#fff'); R(x + 7, y - 1, 2, 1, '#ffb02e'); R(x + 5, y - 1, 1, 1, K); });
   if (Math.floor(T * 2) % 2 === 0 || overlayT < 0.5) Font.bigCentered(ctx, 'TAP TO START', 97, LH - 28, '#fff', 2, K);
   if (level > 1) Font.smallCentered(ctx, 'CONTINUE: SHIFT ' + level + (career ? '   CAREER ' + fmt(career) : ''), 97, LH - 10, '#fff', 1, K);
+  if (window.AJ_VERSION) Font.small(ctx, 'V' + window.AJ_VERSION, LW - 2 - Font.smallWidth('V' + window.AJ_VERSION), 2, '#fff', 1, K);
 }
 
 // ---------- play rendering ----------

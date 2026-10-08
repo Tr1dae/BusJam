@@ -432,7 +432,10 @@ const Minis = (() => {
 
   // ======================= GROUP HANGOUT (find the date that suits everyone) =======================
   const CREW = ['Becca', 'Sarah', 'Jess', 'Carly', 'Katrina', 'Jann', 'Angela', 'Sophie'];
-  const EXCUSES = ["I'M ON NIGHTS.", 'DENTIST. SORRY.', 'PICKING UP OT.', "I'LL BE ASLEEP.", 'MAYBE? (NO.)', 'MY KID HAS A RECITAL.', "THAT'S MY ONE DAY OFF.", 'MANDATORY TRAINING.', 'IN-LAWS. HELP.'];
+  const EXCUSES = ["I'M ON NIGHTS. I'M ALWAYS ON NIGHTS.", 'PICKING UP OT. RENT IS RENT.', "I'LL BE ASLEEP. ALL DAY.", "MAYBE? (THAT'S A NO.)", "THAT'S MY ONE DAY OFF.",
+    'MANDATORY TRAINING. ON HAND WASHING.', "ON CALL. DON'T ASK.", 'MY CAT HAS A VET THING.', "GYM. I WON'T GO, BUT STILL.", 'FLOATING TO THE ED. PRAY FOR ME.',
+    'MY BODY IS STILL ON NIGHTS.', 'I HAVE A NAP SCHEDULED.', "CAN'T. STILL CHARTING LAST SHIFT.", 'SKILLS DAY. THE CPR DUMMY AWAITS.', 'LAUNDRY. FOUR WEEKS OF IT.',
+    "HIDING FROM MY MANAGER.", "I'LL BE STARING AT A WALL.", 'SOCIAL BATTERY: 0%.'];
   const crewHair = n => (typeof HAIR !== 'undefined' && HAIR[n]) || ['#4f3322', '#38231a'];
   const hangout = {
     title: 'GROUP HANGOUT', head: '#ff7eb6', song: 'break',

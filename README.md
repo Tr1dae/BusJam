@@ -8,7 +8,7 @@ Coloured hospital beds are jammed in the corridor. Tap one to roll it out the wa
 - **Quirks:** triage-pending grey beds (shift 3+), flip-floppers that turn around every move (shift 5+), and the Code Blue crash cart with a move counter (shift 7+).
 - **The ward:** the loop runs round a nurses' station; tap the station sign for the patient legend, which also pauses the shift. Fish tank, wet floor sign, wheelchair, therapy corgi, sleeping visitor, pot plant, vending machine, coffee machine and wall clock (real time) all react to taps.
 - **Cameos:** once a shift one of Becca's friends (Becca, Sarah, Jess, Carly, Katrina, Jann, Angela, Sophie) walks on in green scrubs with a comment; now and then a doctor pops up with a daft request. Tap the bubble to skip.
-- **Difficulty:** shift 1 is a tutorial. From shift 2 the first patients belong to beds buried deep in the jam (more of them later on), only so many rows fit on the loop at once (the rest queue at the sides), patient blocks are shuffled away from the order beds can get out, and departments ramp up faster. All in `levelConfig` (`buried`, `window`, `scatter`, `depts`). Retrying a shift deals a fresh layout.
+- **Difficulty:** shift 1 is a tutorial. From shift 2 the first patients belong to beds buried deep in the jam (more of them later on), only so many rows fit on the loop at once (the rest queue at the sides), patient blocks are shuffled away from the order beds can get out, departments ramp up faster, more beds are packed in, more and more beds face back into the jam (each with about `depth` beds in its way), and some beds lie crosswise across the others' roads. All in `levelConfig` (`buried`, `window`, `scatter`, `depts`, `vehicles`, `inward`, `depth`, `cross`). Retrying a shift deals a fresh layout.
 - **Porters:** in the jam beds are drawn flat from above; once a bed starts moving it's lifted onto its frame with legs and castors and a porter in blue scrubs pushes it from the head end, including while it's parked (diagonally) in a bay.
 - **Bays free up instantly:** as soon as a bed fills, its bay is free for the next bed while the full one reverses out.
 - **Bays and score:** 3 bays are open and 3 are locked. Opening them costs 500, then 1,000, then 1,500 points; any left locked at the end of a shift are worth +500 each. Patients score 10 each, departures 5 per seat, a cleared shift 1,000, and the career total is saved.
@@ -30,7 +30,7 @@ A short dash: a porter pushes the bed down pseudo-3D hospital corridors to the O
 
 ## Running it
 
-No build step. Open `index.html`, or serve the folder (GitHub Pages: Settings → Pages → Deploy from branch `main`, `/ (root)`). On a phone, "Add to Home Screen" runs it full screen.
+No build step. Bump the `?v=` version in `index.html` on each release so phones fetch the new scripts (it shows in the corner of the title screen). Open `index.html`, or serve the folder (GitHub Pages: Settings → Pages → Deploy from branch `main`, `/ (root)`). On a phone, "Add to Home Screen" runs it full screen.
 
 `?level=N` jumps to a shift. Progress and sound settings are saved in the browser.
 

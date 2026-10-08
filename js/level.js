@@ -32,7 +32,7 @@ const LEVEL_SHAPES = [
 
 function levelConfig(n) {
   return {
-    vehicles: Math.min(12 + n * 2, 44),
+    vehicles: n < 2 ? 14 : Math.min(14 + n * 3, 44),
     depts: n < 2 ? 3 : Math.min(4 + Math.floor((n - 2) / 2), 6),
     diag: n >= 2,
     sizes: n < 2 ? [1, 1, 0] : [1, 1.2, 0.8],
@@ -42,11 +42,17 @@ function levelConfig(n) {
     cartTimer: 7,
     mix: Math.min(0.15 + n * 0.03, 0.45),
     // how many rows of patients can be on the loop at once (0 = as many as fit); fewer rows means less to choose from
-    window: n < 2 ? 0 : Math.max(10, 18 - n),
+    window: n < 2 ? 0 : Math.max(12, 18 - n),
     // how far patient blocks drift from the order their ambulances can get out
     scatter: n < 2 ? 0 : Math.min(2 + n, 8),
     // the first patients through the door belong to this many beds buried deep in the jam
     buried: n < 2 ? 0 : Math.min(1 + Math.floor((n - 2) / 3), 3),
+    // chance that each bed, as the solution is built, is turned to face back into the jam (more beds in its way)
+    inward: n < 2 ? 0 : Math.min(0.4 + n * 0.05, 0.9),
+    // how many beds an inward-facing bed should have in its way
+    depth: n < 2 ? 0 : Math.min(1 + Math.floor(n / 4), 3),
+    // share of beds parked crosswise (left-right) across the others' roads
+    cross: n < 2 ? 0 : Math.min(0.06 + n * 0.008, 0.16),
     // early shifts use a smaller lot so the jam still looks like a jam
     shape: ((base, ls) => (u, v) => base(u / ls, v / ls))(LEVEL_SHAPES[(n - 1) % LEVEL_SHAPES.length], Math.min(1, 0.5 + n * 0.025)),
   };
@@ -97,9 +103,11 @@ function generateOnce(n, lot, seed) {
       if (side) { const d = AMB_W + 1, slide = r() < 0.5 ? 0 : (sz.len - p.len) / 2 * (r() < 0.5 ? -1 : 1); v = { x: p.x - s * d * sg + c * slide, y: p.y + c * d * sg + s * slide }; }
       else { const d = (p.len + sz.len) / 2 + 1; v = { x: p.x + c * d * sg, y: p.y + s * d * sg }; }
       v.dir = p.dir;
+      // a crosswise blocker: same spot, turned to lie left-right
+      if (r() < cfg.cross && p.dir !== 0) { v.dir = 0; if (!side) { v.x = p.x + c * ((p.len / 2) + AMB_W / 2 + 1) * sg; v.y = p.y + s * ((p.len / 2) + AMB_W / 2 + 1) * sg; } }
     } else {
       const t = r() * Math.PI * 2, rad = Math.sqrt(r()) * Math.min(1, 0.5 + n * 0.025);
-      v = { x: lot.cx + Math.cos(t) * rad * lot.rx, y: lot.cy + Math.sin(t) * rad * lot.ry, dir: axes[Math.floor(r() * axes.length)] };
+      v = { x: lot.cx + Math.cos(t) * rad * lot.rx, y: lot.cy + Math.sin(t) * rad * lot.ry, dir: r() < cfg.cross ? 0 : axes[Math.floor(r() * axes.length)] };
     }
     v.x = Math.round(v.x); v.y = Math.round(v.y); v.len = sz.len; v.cap = sz.cap; v.kind = 'amb';
     if (!inside(v)) continue;
@@ -108,13 +116,23 @@ function generateOnce(n, lot, seed) {
     packed.push(v);
   }
   const left = packed.slice(), order = [];
+  // how many already-peeled beds a road crosses: in the real jam those all have to move first
+  const blockers = (v, d) => { const sw = sweepBox(v, d); let k = 0; for (const o of order) if (sat(sw, vBox(o, -0.1))) k++; return k; };
   while (left.length) {
     const opts = [];
     for (const v of left) { const f = pathClear(v, v.dir, left), b = pathClear(v, (v.dir + 4) % 8, left); if (f || b) opts.push({ v, f, b }); }
     if (!opts.length) { left.splice(Math.floor(r() * left.length), 1); continue; }
-    const o = opts[Math.floor(r() * opts.length)], v = o.v;
+    let o, inward = false;
+    if (r() < cfg.inward) {
+      // point back into the jam: take the free bed and road with about cfg.depth earlier beds in the way
+      let best = -1e9;
+      for (const q of opts) for (const d of [q.f && q.v.dir, q.b && (q.v.dir + 4) % 8]) { if (d === false) continue; const k = -Math.abs(blockers(q.v, d) - cfg.depth) + r() * 0.5; if (k > best) { best = k; o = { ...q, d }; } }
+      inward = true;
+    } else o = opts[Math.floor(r() * opts.length)];
+    const v = o.v;
     v.flip = false;
-    if (o.f && o.b) { if (r() < 0.5) v.dir = (v.dir + 4) % 8; v.flip = r() < cfg.flip * 2; }
+    if (inward) { v.dir = o.d; if (o.f && o.b) v.flip = r() < cfg.flip * 2; }
+    else if (o.f && o.b) { if (r() < 0.5) v.dir = (v.dir + 4) % 8; v.flip = r() < cfg.flip * 2; }
     else if (o.b) v.dir = (v.dir + 4) % 8;
     order.push(v); left.splice(left.indexOf(v), 1);
   }
