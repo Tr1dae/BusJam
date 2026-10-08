@@ -32,7 +32,7 @@ const LEVEL_SHAPES = [
 
 function levelConfig(n) {
   return {
-    vehicles: Math.min(24 + n * 4, 72),
+    vehicles: Math.min(12 + n * 2, 44),
     depts: Math.min(3 + Math.floor((n - 1) / 2), 6),
     diag: n >= 2,
     sizes: n < 2 ? [1, 1, 0] : [1, 1.2, 0.8],
@@ -40,9 +40,9 @@ function levelConfig(n) {
     flip: n >= 5 ? Math.min(0.1 + 0.01 * (n - 5), 0.2) : 0,
     cart: n >= 7,
     cartTimer: 7,
-    mix: Math.min(0.2 + n * 0.04, 0.6),
+    mix: Math.min(0.15 + n * 0.03, 0.45),
     // early shifts use a smaller lot so the jam still looks like a jam
-    shape: ((base, ls) => (u, v) => base(u / ls, v / ls))(LEVEL_SHAPES[(n - 1) % LEVEL_SHAPES.length], Math.min(1, 0.68 + n * 0.04)),
+    shape: ((base, ls) => (u, v) => base(u / ls, v / ls))(LEVEL_SHAPES[(n - 1) % LEVEL_SHAPES.length], Math.min(1, 0.5 + n * 0.025)),
   };
 }
 
@@ -77,7 +77,7 @@ function generateLevel(n, lot) {
 function generateOnce(n, lot, seed) {
   const r = rng(seed), cfg = levelConfig(n);
   const axes = cfg.diag ? [0, 1, 2, 3] : [0, 2];
-  const SIZES = [{ cap: 4, len: 18 }, { cap: 6, len: 22 }, { cap: 8, len: 28 }];
+  const SIZES = [{ cap: 16, len: 18 }, { cap: 24, len: 22 }, { cap: 40, len: 28 }];
   const sw = cfg.sizes, swSum = sw.reduce((a, b) => a + b, 0);
   const pickSize = () => { let x = r() * swSum; for (let i = 0; i < sw.length; i++) { x -= sw[i]; if (x < 0) return SIZES[i]; } return SIZES[0]; };
   const inside = v => vBox(v).every(([x, y]) => cfg.shape((x - lot.cx) / lot.rx, (y - lot.cy) / lot.ry));
@@ -91,7 +91,7 @@ function generateOnce(n, lot, seed) {
       else { const d = (p.len + sz.len) / 2 + 1; v = { x: p.x + c * d * sg, y: p.y + s * d * sg }; }
       v.dir = p.dir;
     } else {
-      const t = r() * Math.PI * 2, rad = Math.sqrt(r()) * Math.min(1, 0.68 + n * 0.04);
+      const t = r() * Math.PI * 2, rad = Math.sqrt(r()) * Math.min(1, 0.5 + n * 0.025);
       v = { x: lot.cx + Math.cos(t) * rad * lot.rx, y: lot.cy + Math.sin(t) * rad * lot.ry, dir: axes[Math.floor(r() * axes.length)] };
     }
     v.x = Math.round(v.x); v.y = Math.round(v.y); v.len = sz.len; v.cap = sz.cap; v.kind = 'amb';
@@ -119,8 +119,9 @@ function generateOnce(n, lot, seed) {
   order.forEach((v, i) => { v.id = i; if (v.kind === 'amb') { v.dept = deptPool[Math.floor(r() * deptPool.length)]; v.mystery = r() < cfg.mystery; } });
 
   // patients come in rows of 4 of one department, in solution order, lightly shuffled
-  const rows = [];
-  for (const v of order) if (v.kind === 'amb') { let n = v.cap; while (n > 0) { rows.push({ dept: v.dept, n: Math.min(4, n) }); n -= 4; } }
-  for (let i = 0; i + 1 < rows.length; i++) if (r() < cfg.mix) { [rows[i], rows[i + 1]] = [rows[i + 1], rows[i]]; i++; }
+  // each ambulance's patients arrive as one solid block; neighbouring blocks sometimes swap
+  const blocks = order.filter(v => v.kind === 'amb').map(v => Array.from({ length: Math.ceil(v.cap / 4) }, (_, k) => ({ dept: v.dept, n: Math.min(4, v.cap - k * 4) })));
+  for (let i = 0; i + 1 < blocks.length; i++) if (r() < cfg.mix) { [blocks[i], blocks[i + 1]] = [blocks[i + 1], blocks[i]]; i++; }
+  const rows = blocks.flat();
   return { vehicles: order, rows, cfg };
 }

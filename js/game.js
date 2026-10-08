@@ -28,7 +28,7 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 
 // ---------- layout ----------
 const LOOP = { cx: 97, cy: 80, rx: 56, ry: 38 };
-const LANES = [-10.5, -3.5, 3.5, 10.5], ROW = 9, LOOP_SPEED = 26;
+const LANES = [-10.5, -3.5, 3.5, 10.5], ROW = 9, LOOP_SPEED = 30;
 const BAY_Y = 148, BAY_W = 26, BAY_H = 38, LOT_TOP = 194, SLOTS = 6, OPEN = 5;
 const bayX = i => 10 + i * 30, bayCx = i => bayX(i) + 13, bayCy = () => BAY_Y + 19;
 const LOT = { cx: 97, cy: Math.round((LOT_TOP + LH - 4) / 2), rx: 92, ry: Math.round((LH - 4 - LOT_TOP) / 2) - 2 };
@@ -199,7 +199,7 @@ function update(dt) {
     fl.t += dt / 0.7;
     if (fl.t >= 1 && !fl.done) {
       fl.done = true; const bb = G.bays[fl.bay]; bb.filled++;
-      Sound.sfx.board(bb.filled); G.pops.push({ dept: fl.dept, x: bayCx(fl.bay) + (Math.random() - 0.5) * 8, y: BAY_Y + 6, t: 0, vx: (Math.random() - 0.5) * 16 });
+      Sound.sfx.board(Math.floor(bb.filled / bb.v.cap * 9)); G.pops.push({ dept: fl.dept, x: bayCx(fl.bay) + (Math.random() - 0.5) * 8, y: BAY_Y + 6, t: 0, vx: (Math.random() - 0.5) * 16 });
       if (bb.filled >= bb.v.cap) { bb.state = 'full'; bb.t = 0; }
     }
   }
