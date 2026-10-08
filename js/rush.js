@@ -230,6 +230,7 @@ const Rush = (() => {
     for (let n = 0; n <= DRAW + 1; n++) { const seg = s.track[base + n] || s.track[s.track.length - 1]; xs.push(x - dx * frac); ys.push(y); x += dx; dx += seg.curve; y += dy; dy += seg.hill; }
     const P = (X, Y, n, off = 0) => { const dz = Math.max(0.25, n - frac + off), sc = K3 / dz, bend = -BEND * dz * dz;
       return { x: LW / 2 + (X + xs[n] - camX) * sc, y: hz + (CH - Y - ys[n] - bend) * sc, s: sc }; };
+    const lamps = [];
     const tn = s.pan && s.pan.flipped ? null : nextTurn(), endN = Math.min(DRAW, s.len - base + 1), turnN = tn ? tn.z - base : 1e9, lastN = Math.min(endN, turnN);
     // segments, far to near
     for (let n = lastN - 1; n >= 0; n--) {
@@ -240,6 +241,7 @@ const Rush = (() => {
       const ft = n / DRAW, F = c => fog(c, ft);
       // ceiling with light panels
       rows(cl1.y, cl1.x, cr1.x, cl2.y, cl2.x, cr2.x, F(zi % 2 ? '#f4f2ea' : '#ebe8de'));
+      if (seg.light && n < lastN) { const f = P(0, 0, n, 0.45); lamps.push([f.x, f.y, f.s]); }
       if (seg.light) { const l1 = P(-0.55, H, n, 0.15), r1 = P(0.55, H, n, 0.15), l2 = P(-0.55, H, n, 0.75), r2 = P(0.55, H, n, 0.75); rows(l1.y, l1.x, r1.x, l2.y, l2.x, r2.x, '#fffbe0'); }
       // floor tiles, dashed lane lines, and red and blue wayfinding stripes
       rows(fl1.y, fl1.x, fr1.x, fl2.y, fl2.x, fr2.x, F(zi % 2 ? '#d6e2e9' : '#c3d2dc'));
@@ -285,6 +287,13 @@ const Rush = (() => {
     ctx.restore();
     if (pan) { ctx.globalAlpha = 0.35; for (let i = 0; i < 14; i++) R(0, Math.floor((i * 37 + T * 400) % LH), LW, 1, '#fff'); ctx.globalAlpha = 1; }
     drawPlayer();
+    // pools of light under each ceiling panel slide past as you run
+    { const h = new Date().getHours(), night = h >= 19 || h < 7;
+      Light.begin(night ? '#a3a9c8' : '#c8cddd', 0.35);
+      for (const [x, y, sc] of lamps) if (sc > 3) Light.add(x + ox, y, Math.min(140, sc * 1.1), Math.min(70, sc * 0.4), '#fff1d6', 0.5, 0, 1.1);
+      for (const [x, y, sc] of lamps) if (sc > 3) Light.add(x + ox, y - sc * 2.5, Math.min(120, sc * 0.9), Math.min(40, sc * 0.3), '#fffbe0', 0.4, 0.08, 1.1);
+      Light.add(LW / 2, LH - 30, 50, 34, '#fff1d6', 0.3);
+      Light.end(); }
     // speed lines while boosted
     if (s.boost > 0) { ctx.globalAlpha = 0.5; for (let i = 0; i < 10; i++) { const a = i * 0.63 + T * 3, r = (T * 300 + i * 40) % 140 + 30; R(Math.round(LW / 2 + Math.cos(a) * r), Math.round(hz + Math.sin(a) * r * 0.7), 2, 2, i % 2 ? '#ff4d4d' : '#3d7bff'); } ctx.globalAlpha = 1; }
     drawFx();

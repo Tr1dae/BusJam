@@ -32,6 +32,9 @@ const Minis = (() => {
   // static scenery is painted once per screen height into its own canvas
   const bgCache = new Map();
   function bgLayer(key, draw) { const k = key + '|' + LH; let c = bgCache.get(k); if (!c) { c = document.createElement('canvas'); c.width = LW; c.height = LH; draw(c.getContext('2d')); bgCache.set(k, c); } ctx.drawImage(c, 0, 0); }
+  // minigames are lit a little more gently than the jam so everything stays readable
+  const night = () => { const h = new Date().getHours(); return h >= 19 || h < 7; };
+  const amb = (day, nite) => night() ? nite : day;
   const boxed = (x, y, w, h, col, g = ctx) => { R(x - 1, y - 1, w + 2, h + 2, K, g); R(x, y, w, h, col, g); };
 
   // ======================= CALL LIGHT FRENZY =======================
@@ -109,8 +112,20 @@ const Minis = (() => {
       else if (r.kind === 'fake') { m.combo = 0; m.busy = m.busyMax = 1.5; m.busyText = FETCH[r.text]; Sound.sfx.nope(); }
       else { m.combo = 0; m.busy = m.busyMax = 2.2; m.busyText = 'DOCTOR: ' + one(DR_FAVOURS); Sound.sfx.boing(); }
     },
+    light(m) {
+      Light.begin(amb('#c4c9dc', '#9ea5c6'), 0.35);
+      for (let i = 0; i < 9; i++) {
+        const c = calls.cell(i), r = m.rooms[i], fl = c.y + c.h - 7, dw = 34, dh = Math.min(74, c.h - 44), dx = c.x + 11, dy = fl - dh;
+        // ceiling lights down the corridor, a buzzing one in the middle
+        Light.add(c.x + 32, c.y + c.h * 0.55, 42, c.h * 0.5, '#fff1d6', 0.3 * (i === 4 ? Light.flicker(2, 8) : 1), 0, 1.1);
+        if (r.state === 'call' && r.kind !== 'doctor') { const on = Math.floor(T * 6 + i) % 2 === 0; Light.add(dx + dw / 2, dy - 4, 24, 20, '#ff4d4d', on ? 0.75 : 0.35, on ? 0.18 : 0); }
+        if (r.open > 0.05) { Light.add(dx + 25, dy + 14, 12, 12, '#ffe9a8', 0.6 * r.open, 0.15); Light.add(dx + dw / 2, fl, 20, 6, '#ffe9a8', 0.4 * r.open); }
+      }
+      Light.end();
+    },
     draw(m) {
       bgLayer('calls', g => calls.paintBg(g));
+      const later = [];
       for (let i = 0; i < 9; i++) {
         const c = calls.cell(i), r = m.rooms[i], fl = c.y + c.h - 7, dw = 34, dh = Math.min(74, c.h - 44), dx = c.x + 11, dy = fl - dh;
         const on = r.state === 'call' && r.kind !== 'doctor' && Math.floor(T * 6 + i) % 2 === 0;
@@ -137,12 +152,14 @@ const Minis = (() => {
         R(dx + dw + 4, dy + 3, 15, 9, K); R(dx + dw + 5, dy + 4, 13, 7, '#fff'); Font.small(ctx, String(r.num), dx + dw + 6, dy + 5, '#334155');
         // call light dome over the door
         R(dx + dw / 2 - 5, dy - 8, 10, 5, K); R(dx + dw / 2 - 4, dy - 7, 8, 4, on ? '#ff4d4d' : '#d8dde4'); R(dx + dw / 2 - 3, dy - 7, 3, 1, on ? '#ffd6dc' : '#f4f6f9');
-        if (r.state === 'call') {
+        if (r.state === 'call') later.push(() => {
           const real = r.kind === 'real', bg = real ? '#e8424f' : r.kind === 'fake' ? '#fff' : '#e9edf2', fg = real ? '#fff' : r.kind === 'fake' ? '#3d6fb6' : '#475569';
           const b = bubble(r.text, c.x + 32, dy - 22 + (real ? Math.round(Math.sin(T * 12 + i)) : 0), bg, fg, c.x + 1, c.x + c.w - 1);
           if (real) { const left = Math.max(0, 1 - r.t / r.life); R(b.bx, dy - 11, b.w, 2, K); R(b.bx, dy - 11, Math.round(b.w * left), 2, left < 0.35 ? '#ff4d4d' : '#ffd23f'); }
-        }
+        });
       }
+      calls.light(m);
+      later.forEach(f => f());
       hud(m, 1 - m.t / m.dur);
       if (m.busy > 0) {
         ctx.fillStyle = 'rgba(20,24,36,.5)'; ctx.fillRect(0, 13, LW, LH - 13);
@@ -201,6 +218,16 @@ const Minis = (() => {
       const pts = (best.kind === 'shock' ? 100 : perfect ? 20 : 10) + Math.min(m.combo, 10) * 2; m.score += pts;
       pop(best.kind === 'shock' ? 'CLEAR!' : perfect ? 'PERFECT' : 'GOOD', 97, LH - 84, perfect ? '#ffe066' : '#c9ffd9');
       if (best.kind === 'shock') { m.zap = 1; Sound.sfx.zap(); shakeScreen(0.25, 2); sparkle(60, cpr.sy() + 64, 16, ['#ffe066', '#fff']); }
+    },
+    light(m, beat) {
+      const sy = cpr.sy(), wy = Math.max(92, sy - 26), wh = sy + 24 - wy;
+      Light.begin(amb('#c3c9dc', '#9aa1c4'), 0.3);
+      Light.add(97, 49, 92, 42, m.rosc ? '#5dff9d' : '#ffd23f', 0.22, 0.05);
+      Light.add(56, wy + wh / 2, 40, 34, '#a9c2ff', 0.4, 0, 1.1);
+      Light.add(100, sy + 70, 90, 56, '#fff1d6', 0.42, 0, 1.1);
+      Light.add(11, sy + 93, 14, 12, '#ffd23f', 0.35 + (beat >= 24 && beat < 27.5 ? 0.3 * Math.abs(Math.sin(T * 12)) : 0), 0.1);
+      Light.add(97, LH - 41, 110, 26, '#8fb2ff', 0.25);
+      Light.end();
     },
     paintBg(g) {
       const sy = cpr.sy(), floor = sy + 120;
@@ -296,6 +323,7 @@ const Minis = (() => {
       }
       Font.small(ctx, 'COMPRESSIONS', 6, ly + lh + 5, '#475569');
       Font.small(ctx, 'COMBO ' + m.combo, LW - 6 - Font.smallWidth('COMBO ' + m.combo), ly + lh + 5, '#475569');
+      cpr.light(m, beat);
       hud(m, 1 - Math.min(1, beat / m.endBeat));
     },
     stats: m => ['ON BEAT ' + Math.round(cpr.acc(m) * 100) + '%   BEST COMBO ' + m.best, cpr.acc(m) >= 0.9],
@@ -397,6 +425,10 @@ const Minis = (() => {
       R(cx - 23, cy - 2, 46, 3, K); R(cx - 22, cy, 44, 30, K); R(cx - 21, cy, 42, 29, '#ffffff');
       for (let i = 0; i < 8; i++) R(cx - 18 + i * 5, cy + 2, 1, 26, '#dfe5ec'); R(cx - 20, cy + 29, 40, 2, K); R(cx - 22, cy - 1, 44, 1, '#fff');
       Font.big(ctx, 'MEDS', cx - 11, cy + 12, '#9b6bd6');
+      Light.begin(amb('#d3d7e4', '#b2b7d0'), 0.25);
+      Light.add(70, 110, 80, 70, '#fff6e0', 0.3, 0, 1.1); Light.add(70, LH - 120, 80, 70, '#fff6e0', 0.3, 0, 1.1);
+      Light.add(168, 72, 22, 12, '#5dff9d', 0.5, 0.12); Light.add(cx, cy + 14, 30, 26, '#ffffff', 0.25);
+      Light.end();
       hud(m, 1 - m.t / m.dur);
     },
     stats: m => ['CAUGHT ' + m.caught + '   WRONG MEDS ' + m.wrong, m.done === 'win' && m.wrong === 0],
@@ -499,6 +531,12 @@ const Minis = (() => {
       c.g.slice(0, 3).forEach((t, i) => t && Font.smallCentered(ctx, t, cx + cw / 2, cy + 10 + i * 8, c.g[4]));
       if (m.spill > 0) { for (let i = 0; i < 10; i++) R(cx - 10 + i * 6, ct - 2 + (i % 3), 5, 2, '#6b3f22'); }
       if (m.state === 'graded' && m.level <= 1) for (let i = 0; i < 3; i++) { const yy = cy - 6 - ((T * 18 + i * 7) % 18); ctx.globalAlpha = 0.5; R(cx + 10 + i * 9 + Math.round(Math.sin(T * 4 + i) * 2), Math.round(yy), 2, 3, '#fff'); ctx.globalAlpha = 1; }
+      { const cb = Math.max(46, Math.min(my - 8, 70));
+        Light.begin(amb('#c6c3cf', '#a29fb6'), 0.35);
+        for (const x of [24, 72, 120, 168]) Light.add(x, cb + 18, 32, 26, '#ffe2b0', 0.5, 0, 1.2);
+        Light.add(97, my + 19, 52, 16, '#5dff9d', m.state === 'pour' ? 0.35 : 0.25, 0.06);
+        Light.add(97, ct - 30, 46, 40, '#ffe2b0', 0.3, 0, 1.1); Light.add(33, ct - 61, 6, 4, '#5dff9d', 0.5, 0.15);
+        Light.end(); }
       Font.smallCentered(ctx, 'CUP ' + Math.min(m.cup + 1, 3) + ' OF 3', 97, ct + 12, '#f2ead8', 1, K);
       if (m.state === 'ready' && Math.floor(T * 3) % 2) Font.bigCentered(ctx, 'HOLD TO POUR', 97, ct + 26, '#fff', 2, K);
       hud(m, 1 - m.t / m.dur);
@@ -598,7 +636,11 @@ const Minis = (() => {
         if (h.carry) { R(cx - 5, cy - 4, 10, 8, K); R(cx - 4, cy - 3, 8, 6, '#ffd166'); R(cx - 4, cy - 3, 8, 1, '#d9a05b'); R(cx - 1, cy - 1, 2, 2, '#d63b3b'); }
         if (h.mgr) Font.small(ctx, 'MGR', Math.round(q.x - Math.cos(h.a) * 22) - 5, Math.round(q.y - Math.sin(h.a) * 22) - 2, '#fff');
       }
-      Font.smallCentered(ctx, 'SLICES LEFT ' + pizza.left(m), 97, LH - 12, '#fff');
+      Light.begin(amb('#b3a79c', '#8f8296'), 0.45, '#20140e');
+      Light.add(m.cx, m.cy - 10, 120, 130, '#ffe2b0', 0.5, 0, 1);
+      Light.add(LW - 21, LH - 52, 18, 24, '#9fc0ff', 0.45, 0.1);
+      Light.end();
+      Font.smallCentered(ctx, 'SLICES LEFT ' + pizza.left(m), 97, LH - 12, '#fff', 1, K);
       hud(m, 1 - m.t / m.dur);
     },
   };
@@ -695,6 +737,11 @@ const Minis = (() => {
         R(tx - 1, ty - 1, tw + 2, 9, K); R(tx, ty, tw, 7, m.asked.has(i) ? '#fff' : '#ffe066'); Font.small(ctx, n.toUpperCase(), tx + 3, ty + 1, K);
         if (!m.asked.has(i) && Math.floor(T * 2 + i) % 2) Font.bigCentered(ctx, '?', c.x + c.w - 6, c.y + c.h - 12 - img.height * k - 4, '#b5427e', 1, '#fff');
       });
+      Light.begin(amb('#d6cfdf', '#aca4c6'), 0.25, '#2a1b33');
+      for (let row = 0; row < 2; row++) { const c = hangout.nurseCell(row * 4); for (const x of [50, 146]) Light.add(x, c.y + c.h * 0.55, 56, c.h * 0.55, '#ffe2b0', 0.4, 0, 1.1); }
+      { const c = hangout.nurseCell(0); Light.add(149, c.y + 18, 44, 26, '#a9c2ff', 0.35, 0, 1.1); }
+      if (m.sel >= 0) { const c = hangout.nurseCell(m.sel); Light.add(c.x + c.w / 2, c.y + c.h - 30, 24, 40, '#ffd6e8', 0.45, 0.06); }
+      Light.end();
       // chat box with whoever is talking
       const by = hangout.calTop() - 40;
       R(5, by - 1, LW - 10, 36, K); R(6, by, LW - 12, 34, '#fff'); R(6, by + 33, LW - 12, 1, '#f1e4ea');

@@ -877,6 +877,9 @@ function sideAmbulance(X, Y, dept, flash) {
 function drawSplash() {
   ctx.drawImage(splashBg, 0, 0);
   const { gy } = SB;
+  // at night the sun clocks out and a moon and a few stars clock in
+  if (Light.on && isNight()) { disc(182, 128, 10, '#a3d9ff'); disc(182, 128, 7, '#fbf6dc'); disc(185, 126, 6, '#a3d9ff');
+    for (const [sx, sy] of [[20, 70], [64, 104], [120, 96], [160, 74], [178, 100], [8, 120], [100, 120]]) R(sx, sy, 1, 1, Math.floor(T * 2 + sx) % 5 ? '#ffffff' : '#c9d6ff'); }
   // drifting clouds and flapping birds
   const cloud = (cx, cy) => { disc(cx, cy, 4, '#fff'); disc(cx + 5, cy - 2, 5, '#fff'); disc(cx + 11, cy, 4, '#fff'); R(cx - 4, cy, 19, 4, '#fff'); R(cx - 3, cy + 3, 17, 1, '#d9ecfb'); };
   [[12, 104, 3], [166, 150, 2], [70, 128, 4]].forEach(([x0, y, sp]) => cloud(Math.round(((x0 + T * sp) % (LW + 40)) - 20), y));
@@ -917,6 +920,18 @@ function drawSplash() {
     ctx.drawImage(img, SB.bench.BX + 4, SB.bench.BY - img.height + 5); ctx.restore(); }
   [[62, 99, 0], [40, 101, 1]].forEach(([dx, dyy, i]) => { const bob = Math.floor(T * 2 + i) % 2, x = dx + Math.round(Math.sin(T * 0.7 + i * 2) * 4), y = gy + dyy + bob;
     R(x, y, 6, 3, '#fff'); R(x + 4, y - 2, 3, 3, '#fff'); R(x + 7, y - 1, 2, 1, '#ffb02e'); R(x + 5, y - 1, 1, 1, K); });
+  // dusk falls on the hospital at night: lit windows, sign bulbs and the siren carry the light
+  if (Light.on) {
+    const night = isNight(); Light.begin(night ? '#6a71a3' : '#f6f2ea', night ? 0.45 : 0.18, night ? '#141833' : '#3a2a1a');
+    for (const w of SB.windows) if (w.what !== 'dark') Light.add(w.wx + 8, w.wy + 9, 14, 13, '#ffd98a', night ? 0.7 : 0.15, night ? 0.12 : 0);
+    const sg = SB.sign; Light.add(sg.sx + sg.sw / 2, sg.sy, sg.sw / 2 + 14, 14, '#ffe27a', night ? 0.6 : 0.15, night ? 0.08 : 0);
+    const ax = Math.round(((T * 50) % (LW + 80)) - 40); Light.add(ax, gy + 12, 26, 16, flash ? '#ff5050' : '#4d8bff', night ? 0.7 : 0.3, 0.15);
+    if (night) { Light.add(97, 30, 100, 34, '#c9d4ff', 0.35); }
+    Light.end();
+    // the title stays bright on top
+    Font.bigCentered(ctx, 'AMBULANCE', 97, 10, '#fff', 3, K);
+    Font.bigCentered(ctx, 'JAM', 97, 36 + Math.round(Math.sin(T * 3) * 1.5), '#ff4d4d', 5, K);
+  }
   if (Math.floor(T * 2) % 2 === 0 || overlayT < 0.5) Font.bigCentered(ctx, 'TAP TO START', 97, LH - 28, '#fff', 2, K);
   if (level > 1) Font.smallCentered(ctx, 'CONTINUE: SHIFT ' + level + (career ? '   CAREER ' + fmt(career) : ''), 97, LH - 10, '#fff', 1, K);
   if (window.AJ_VERSION) Font.small(ctx, 'V' + window.AJ_VERSION, LW - 2 - Font.smallWidth('V' + window.AJ_VERSION), 2, '#fff', 1, K);
@@ -959,7 +974,35 @@ function drawPeople(list) {
   list.sort((a, b) => a.y - b.y);
   for (const p of list) { const img = Sprites.patient(p.dept, p.f, Math.floor(T * 6 + p.x) % 2, p.left); ctx.drawImage(img, Math.round(p.x - 7), Math.round(p.y - img.height + 2)); }
 }
+// ---------- lighting ----------
+// night shift (by the phone's clock) is dimmer, so the lamps and screens carry more of the scene
+const isNight = () => { const h = new Date().getHours(); return h >= 19 || h < 7; };
+function lightPlay(sirens) {
+  const night = isNight();
+  Light.begin(night ? '#9aa1c6' : '#c9cee0', night ? 0.45 : 0.3);
+  const warm = night ? '#ffe2b0' : '#fff1d6';
+  // ceiling tubes over the corridor and the jam; one of them has been flickering since 2019
+  Light.add(42, 62, 56, 44, warm, 0.36); Light.add(152, 62, 56, 44, warm, 0.36);
+  for (let y = LOT_TOP + 40, k = 0; y < LH + 30; y += 76, k++) for (const x of k % 2 ? [30, 164] : [58, 138]) {
+    const f = (k === 1 && x === 164) ? Light.flicker(1, 7) : 1; Light.add(x, y, 68, 54, warm, 0.34 * f, 0, 1.1); }
+  // transfer bays: lit when open, dark when locked, the next one to buy glows green
+  for (let i = 0; i < SLOTS; i++) {
+    if (i < G.open) Light.add(bayCx(i), BAY_Y + 17, 18, 30, '#fff6e0', 0.4, 0, 1.1);
+    else if (i === G.open) Light.add(bayCx(i), BAY_Y + 15, 14, 16, '#4ade80', 0.25 + 0.15 * Math.sin(T * 4), 0.08);
+  }
+  // things that glow
+  Light.add(SIGN.x + SIGN.w / 2, SIGN.y + 6, SIGN.w / 2 + 10, 14, '#7fa8ff', 0.45, 0.1);
+  for (const mx of [LOOP.cx - 29, LOOP.cx - 18]) Light.add(mx, LOOP.cy + 9, 9, 7, '#5dff9d', 0.5, 0.12);
+  Light.add(153, 26, 15, 17, '#ff8a8a', 0.6, 0.1); Light.add(22, 121, 27, 18, '#8fe3ff', 0.5, 0.1);
+  Light.add(38, 21, 4, 4, '#ff4d4d', 0.6, 0.3);
+  // code carts pulse red as their timer runs down
+  for (const v of G.vehicles) if (v.kind === 'cart' && v.state === 'lot' && v.timer <= 3) Light.add(v.x, v.y, 22, 18, '#ff4d4d', 0.35 + 0.25 * Math.sin(T * 10), 0.12);
+  // sirens on beds racing off
+  for (const [x, y, on] of sirens) Light.add(x, y, 22, 18, on ? '#ff5050' : '#4d8bff', 0.75, 0.22);
+  Light.end();
+}
 function drawPlay() {
+  const sirens = [];
   ctx.drawImage(playBg, 0, 0);
   drawDecor();
   // the centre sign glints now and then to hint it can be tapped
@@ -1003,7 +1046,7 @@ function drawPlay() {
     walkers.push({ x, y, dept: fl.dept, left: false, f: Math.floor(T * 10) % 4 }); }
   drawPeople(walkers);
   // moving vehicles on top
-  for (const v of G.vehicles) if (v.state === 'exit' || v.state === 'route') drawVehicle(v, v.px, v.py, v.away ? { siren: Math.floor(T * 10) % 2 === 0 } : { raised: true, walking: true });
+  for (const v of G.vehicles) if (v.state === 'exit' || v.state === 'route') { drawVehicle(v, v.px, v.py, v.away ? { siren: Math.floor(T * 10) % 2 === 0 } : { raised: true, walking: true }); if (v.away) sirens.push([v.px, v.py, Math.floor(T * 10) % 2 === 0]); }
   for (const L of G.leavers) { const v = L.v, ax = parkX(L.bay), ay = parkY();
     if (L.t < 0.35) { v.dir = PARK_DIR; drawVehicle(v, ax + Math.round(Math.sin(L.t * 70)), ay, { raised: true }); continue; }
     const t = L.t - 0.35, flash = Math.floor(t * 10) % 2 === 0;
@@ -1012,8 +1055,9 @@ function drawPlay() {
     if (t < 0.45) { const e = ease(t / 0.45) * 26; px = ax - e * 0.6; py = ay + e; }
     else if (t < 0.6) { dir = 0; px = ax - 16; py = ay + 26; }
     else { dir = 0; const u = t - 0.6; py = ay + 27; px = ax - 16 + u * u * 260; }
-    v.dir = dir; drawVehicle(v, px, py, { siren: flash, raised: true, walking: true });
+    v.dir = dir; drawVehicle(v, px, py, { siren: flash, raised: true, walking: true }); sirens.push([px, py, flash]);
     if (dir === 0 && t > 0.7) for (let k = 1; k < 4; k++) R(Math.round(px - v.len / 2 - k * 5 - (t * 40) % 4), Math.round(py) - 3 + k * 2, 3, 1, 'rgba(255,255,255,.7)'); }
+  lightPlay(sirens);
   // FULL! stamp drops onto a bay as it fills
   G.leavers.forEach(L => { const age = T - L.stamp, i = L.bay; if (age > 1.1) return;
     ctx.globalAlpha = age < 0.9 ? 1 : (1.1 - age) / 0.2; Font.bigCentered(ctx, 'FULL!', bayCx(i), bayCy() - 4 - Math.round(Math.max(0, 1 - age * 8) * 10), '#ffe066', 1, K); ctx.globalAlpha = 1; });
@@ -1030,6 +1074,8 @@ function drawPlay() {
 function iconMusic(x, y, on) { R(x + 5, y + 1, 1, 6, K); R(x + 6, y + 1, 2, 1, K); R(x + 7, y + 2, 1, 1, K); R(x + 2, y + 6, 4, 2, K); R(x + 3, y + 5, 2, 1, K); if (!on) slash(x, y); }
 function iconSpeaker(x, y, on) { R(x + 1, y + 3, 2, 3, K); R(x + 3, y + 2, 1, 5, K); R(x + 4, y + 1, 1, 7, K); if (on) { R(x + 6, y + 3, 1, 3, K); R(x + 7, y + 1, 1, 1, K); R(x + 8, y + 2, 1, 5, K); R(x + 7, y + 7, 1, 1, K); } else slash(x, y); }
 function iconRestart(x, y) { R(x + 2, y + 1, 4, 1, K); R(x + 1, y + 2, 1, 5, K); R(x + 2, y + 7, 4, 1, K); R(x + 6, y + 5, 1, 2, K); R(x + 6, y + 1, 1, 2, K); R(x + 7, y + 0, 1, 4, K); R(x + 5, y + 3, 3, 1, K); }
+function iconBulb(x, y, on) { const B = on ? '#ffe066' : '#c8ced8'; R(x + 2, y, 4, 1, K); R(x + 1, y + 1, 1, 4, K); R(x + 6, y + 1, 1, 4, K); R(x + 2, y + 1, 4, 4, B); R(x + 2, y + 5, 1, 1, K); R(x + 5, y + 5, 1, 1, K);
+  R(x + 3, y + 5, 2, 1, B); R(x + 2, y + 6, 4, 2, '#7d8594'); R(x + 3, y + 8, 2, 1, K); if (on) R(x + 3, y + 2, 1, 1, '#fff'); else slash(x, y); }
 function slash(x, y) { for (let i = 0; i < 9; i++) R(x + i, y + i, 1, 1, '#e8424f'); }
 function addButton(x, y, w, h, fn) { buttons.push({ x, y, w, h, fn }); }
 function drawHud() {
@@ -1037,6 +1083,7 @@ function drawHud() {
   Font.bigCentered(ctx, fmt(G.shown), 97, 3, G.shown < 0 ? '#ff8a8f' : (G.score - G.shown > 0.5 ? '#ffe066' : '#fff'), 1, K);
   addButton(SIGN.x - 2, SIGN.y - 2, SIGN.w + 4, 28, () => { Sound.sfx.click(); screen = 'legend'; });
   const x0 = LW - 36;
+  iconBulb(x0 - 12, 2, Light.on); addButton(x0 - 15, 0, 13, 16, () => { Sound.sfx.click(); Light.toggle(); });
   iconMusic(x0, 2, Sound.music); addButton(x0 - 3, 0, 13, 16, () => { Sound.toggleMusic(); if (Sound.music) Sound.play('play'); });
   iconSpeaker(x0 + 12, 2, Sound.effects); addButton(x0 + 9, 0, 13, 16, () => Sound.toggleSfx());
   iconRestart(x0 + 24, 2); addButton(x0 + 21, 0, 15, 16, () => { Sound.sfx.click(); startLevel(level); screen = 'card'; overlayT = 0; });

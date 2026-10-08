@@ -48,3 +48,7 @@ No build step. Bump the `?v=` version in `index.html` on each release so phones 
 | `js/minis.js` | The other minigames and mid-shift breaks |
 
 Design notes and the blurb list are in `docs/`.
+
+## Lighting
+
+`js/light.js` fakes pixel lighting. Each frame a low-res light map is filled with an ambient tint, banded and dithered light pools are added on top, and the map is multiplied over the scene; bright sources (screens, sirens) also get a faint additive bloom. The main game, Emergency Rush, every minigame and the title screen each set up their own lights. After 7 PM and before 7 AM (phone clock) everything is dimmer and the lamps carry more of the scene. The bulb icon in the top bar turns lighting off (remembered in `aj.lights`).
