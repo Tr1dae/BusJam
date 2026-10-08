@@ -41,6 +41,10 @@ function levelConfig(n) {
     cart: n >= 7,
     cartTimer: 7,
     mix: Math.min(0.15 + n * 0.03, 0.45),
+    // how many rows of patients can be on the loop at once (0 = as many as fit); fewer rows means less to choose from
+    window: n <= 2 ? 0 : Math.max(14, 26 - n),
+    // how far patient blocks drift from the order their ambulances can get out
+    scatter: n < 4 ? 0 : Math.min(1 + 0.3 * n, 4),
     // early shifts use a smaller lot so the jam still looks like a jam
     shape: ((base, ls) => (u, v) => base(u / ls, v / ls))(LEVEL_SHAPES[(n - 1) % LEVEL_SHAPES.length], Math.min(1, 0.5 + n * 0.025)),
   };
@@ -122,6 +126,8 @@ function generateOnce(n, lot, seed) {
   // each ambulance's patients arrive as one solid block; neighbouring blocks sometimes swap
   const blocks = order.filter(v => v.kind === 'amb').map(v => Array.from({ length: Math.ceil(v.cap / 4) }, (_, k) => ({ dept: v.dept, n: Math.min(4, v.cap - k * 4) })));
   for (let i = 0; i + 1 < blocks.length; i++) if (r() < cfg.mix) { [blocks[i], blocks[i + 1]] = [blocks[i + 1], blocks[i]]; i++; }
+  // later shifts scatter the blocks further, so patients turn up for ambulances still buried in the jam
+  if (cfg.scatter) { const keyed = blocks.map((b, i) => ({ b, k: i + r() * cfg.scatter })); keyed.sort((a, b) => a.k - b.k); keyed.forEach((x, i) => blocks[i] = x.b); }
   const rows = blocks.flat();
   return { vehicles: order, rows, cfg };
 }

@@ -96,7 +96,7 @@ const NURSES = ['Becca', 'Sarah', 'Jess', 'Carly', 'Katrina', 'Jann', 'Angela'];
 const HAIR = { Becca: ['#4f3322', '#38231a'], Sarah: ['#f0c75e', '#c99a32'], Jess: ['#7a4a2a', '#5c3620'], Carly: ['#b5532e', '#843a1f'],
   Katrina: ['#3a2f3a', '#241c26'], Jann: ['#a8743f', '#7d5329'], Angela: ['#d98a4e', '#a8643a'] };
 const NURSE_LINES = [
-  "Bed 4 wants a sandwich. Bed 4 is nil by mouth. Bed 4 is furious.",
+  "Bed 4 wants a sandwich. Bed 4 is NPO. Bed 4 is furious.",
   "Someone googled their symptoms. They're dying of everything.",
   "Three coffees, no lunch, one working pen. Living the dream.",
   "Doctor wrote 'patient fine'. Patient is not fine.",
@@ -114,6 +114,53 @@ const NURSE_LINES = [
   "Lunch? I've heard of it. Sounds nice.",
   "Allergic to every painkiller except the strong one. Classic.",
   "Full moon tonight. Everybody brace.",
+  "Patient wanted a warm blanket. Then an ice pack. Then a warm blanket.",
+  "He only drinks 'socially'. His liver has a very busy social life.",
+  "The family wants an update every 20 minutes. There is no update.",
+  "Pulled a Lego out of a nose today. Not a child's nose.",
+  "'Pain on a scale of 1 to 10?' 'Purple.' Okay then.",
+  "Visiting hours ended an hour ago. Nobody told the visitors.",
+  "Ate a cold muffin standing over the sharps bin. Fine dining.",
+  "Someone's grandma brought the whole family. And a cake. To ICU.",
+  "Found Bed 2's dentures. In the Jell-O. Don't ask.",
+  "One more 'sweetheart' and I'm hiding the call bell.",
+  "The printer jammed again. I've started talking to it. It's a good listener.",
+  "He says he's fine. He's grey. He is not fine.",
+  "My break got cancelled by a code and a guy who wanted crackers.",
+  "He's leaving against medical advice. In a gown. On backwards.",
+  "Someone used the last box of gloves and didn't restock. Monster.",
+  "Twelve-hour shift. I've been here fourteen. Math is fake.",
+  "'I haven't eaten all day.' There's a burger wrapper in the bed.",
+  "Nights are fine. I just haven't seen the sun since March.",
+  "Bed alarm's going off. Oh good, he's halfway out the window.",
+  "Doctor's been 'on the way' for forty minutes. Same, honestly.",
+  "Dropped my coffee. Grieving. Will chart the loss.",
+  "Patient asked for 'the good Jell-O'. We have one Jell-O.",
+  "Room 3 rang to ask the time. The clock is right in front of them.",
+  "Bed 9 says the food is terrible. Bed 9 has eaten three trays.",
+  "Fell asleep in my car at lunch. Woke up at handover. Iconic.",
+  "He wants a second opinion. From his cousin. Who is a plumber.",
+  "Someone unplugged an IV pump to charge their phone. Brilliant.",
+  "Not saying it's busy, but my step counter thinks I ran a marathon.",
+  "That's his fourth 'last cigarette'. Outside. In a gown. In January.",
+  "Can't find a working thermometer. Going by vibes.",
+  "Visitor wanted the wifi password. Then a sandwich. Then a bed.",
+  "He swallowed a battery 'to see what happens'. Now we know.",
+  "Patient asked if I'm single. Sir, you have a catheter.",
+  "Vending machine ate my coins. Cafeteria's closed. Classic Tuesday.",
+  "That man has been 'just about to leave' since two o'clock.",
+  "'I have a really high pain tolerance,' says the man crying over a splinter.",
+  "The new grad cried in the supply room. Same, honestly.",
+  "Charting's all done. Just kidding. Charting is never done.",
+  "Someone left a 'quick favour' sticky note on my coffee. Rude.",
+  "If you hear screaming, someone ate my lunch from the fridge.",
+  "Trampoline season is back. Ortho is thrilled.",
+  "Fireworks next week. Burns has already cleared a ward.",
+  "He's 'never been sick a day in his life'. He takes fourteen pills.",
+  "Patient said I look tired. Thank you. I am.",
+  "I'm not ignoring the call bell. I'm prioritizing. Loudly.",
+  "Someone asked if we have a vending machine for beds.",
+  "Wrote my own name on my coffee. It's evidence now.",
 ];
 const DOCTOR_LINES = [
   "Has anyone seen my stethoscope? ...Oh. It's on me.",
@@ -127,15 +174,39 @@ const DOCTOR_LINES = [
   "I wrote the orders. In pencil. On a napkin. Somewhere.",
   "My handwriting? It's a font. Look it up.",
   "Bed 2 is in pain? Have we tried asking them to stop?",
-  "Could someone call the family? And my mum? She worries.",
+  "Could someone call the family? And my mom? She worries.",
+  "Why is the patient asleep? Wake them. I need to ask how they're sleeping.",
+  "I've prescribed rest. Can you make them rest harder?",
+  "Is 'vibes' a valid diagnosis? Asking for a chart.",
+  "Let's start them on something. Anything. Surprise me.",
+  "Who moved my coffee? This is a clinical emergency.",
+  "Can you print this for me? I don't know how printers work.",
+  "Quick favour. It's not quick. Or really a favour.",
+  "Can someone page me? I want to see if my pager works.",
+  "My diagnosis is it's either nothing or extremely serious.",
+  "Labs? Which ones? Yes.",
+  "What's the patient's name? You know. The one in the bed.",
+  "I'll round at 6am. Make sure everyone's awake and delighted.",
+  "Can you explain the plan to the family? I don't know the plan.",
+  "Let's up the dose. Of what? We'll figure that out later.",
+  "Quick consult. Twelve minutes. Or three hours. One of those.",
+  "It says 'see nursing notes'. I don't read those.",
+  "Can someone find a med student? I need my bag carried.",
+  "Have we tried turning the patient off and on again?",
+  "Anyone know where I parked? The ambulance bay is fine, right?",
+  "Who ordered this? Oh, me. Cancel it. Actually, don't.",
+  "I'll write that down later. I won't.",
+  "Can you hold the patient's hand? Great. Forever, please.",
+  "The patient's family has questions. You'll love them. Bye!",
 ];
-function nextNurse() {
-  // shuffle bag so everyone gets a turn before anyone repeats
-  let bag = []; try { bag = JSON.parse(localStorage.getItem('aj.nurses') || '[]').filter(n => NURSES.includes(n)); } catch (e) {}
-  if (!bag.length) bag = NURSES.slice().sort(() => Math.random() - 0.5);
-  const name = bag.shift(); try { localStorage.setItem('aj.nurses', JSON.stringify(bag)); } catch (e) {}
-  return name;
+// shuffle bags so names and lines all come round before any repeats
+function fromBag(key, items) {
+  let bag = []; try { bag = JSON.parse(localStorage.getItem(key) || '[]').filter(x => items.includes(x)); } catch (e) {}
+  if (!bag.length) bag = items.slice().sort(() => Math.random() - 0.5);
+  const item = bag.shift(); try { localStorage.setItem(key, JSON.stringify(bag)); } catch (e) {}
+  return item;
 }
+const nextNurse = () => fromBag('aj.nurses', NURSES);
 function scheduleCameos() {
   const t = 8 + Math.random() * 30, list = [{ kind: 'nurse', at: t }];
   if (Math.random() < 0.3) list.push({ kind: 'doctor', at: Math.random() < 0.5 ? Math.max(5, t - 15 - Math.random() * 10) : t + 15 + Math.random() * 15 });
@@ -143,7 +214,7 @@ function scheduleCameos() {
 }
 function startCameo(c) {
   const nurse = c.kind === 'nurse', name = nurse ? nextNurse() : 'Doctor';
-  G.cameo = { kind: c.kind, name, hair: nurse ? HAIR[name] : ['#4f3322', '#38231a'], text: pick(nurse ? NURSE_LINES : DOCTOR_LINES), t: 0, phase: 'in', typed: 0, blip: 0 };
+  G.cameo = { kind: c.kind, name, hair: nurse ? HAIR[name] : ['#4f3322', '#38231a'], text: nurse ? fromBag('aj.lines.n', NURSE_LINES) : fromBag('aj.lines.d', DOCTOR_LINES), t: 0, phase: 'in', typed: 0, blip: 0 };
   if (!nurse) Sound.sfx.boing();
 }
 const CAMEO_IN = 1.1;
@@ -219,7 +290,7 @@ try { level = parseInt(new URLSearchParams(location.search).get('level')) || par
 function startLevel(n) {
   level = n; try { localStorage.setItem('aj.level', n); } catch (e) {}
   const gen = generateLevel(n, LOT);
-  G = { n, cfg: gen.cfg, vehicles: gen.vehicles, offset: 0, rows: [], funnels: [], bays: [], open: OPEN, score: 0, shown: 0, floats: [], bonus: 0,
+  G = { n, cfg: gen.cfg, vehicles: gen.vehicles, offset: 0, rows: [], funnels: [], bays: [], open: gen.cfg.open ?? OPEN, score: 0, shown: 0, floats: [], bonus: 0,
         flyers: [], pops: [], over: null, moves: 0, blurb: pick(BLURBS), endLine: '', playT: 0, cameos: scheduleCameos(), cameo: null };
   for (const v of G.vehicles) { v.state = 'lot'; v.px = v.x; v.py = v.y; v.revealed = !v.mystery; v.bumpT = 0; v.shake = 0; v.flipAnim = 0; }
   for (let i = 0; i < SLOTS; i++) G.bays.push({ state: 'empty', t: 0 });
@@ -227,7 +298,7 @@ function startLevel(n) {
   const seq = gen.rows.slice();
   for (let i = 0; i < NROWS; i++) G.rows.push({ dept: null, lanes: [false, false, false, false], enter: null });
   const byArrival = [...Array(NROWS).keys()].sort((a, b) => ((S_ENT - a * ROW) % loopPath.len + loopPath.len) % loopPath.len - ((S_ENT - b * ROW) % loopPath.len + loopPath.len) % loopPath.len);
-  const fillCount = Math.min(seq.length, Math.round(NROWS * 0.85));
+  const fillCount = Math.min(seq.length, G.cfg.window || Math.round(NROWS * 0.85));
   for (let k = 0; k < fillCount; k++) setRow(G.rows[byArrival[k]], seq.shift());
   G.funnels = FUNNEL_PATHS.map((path, i) => ({ path, sJoin: i ? S_RIGHT : S_LEFT, q: [] }));
   seq.forEach((row, i) => G.funnels[i % 2].q.push({ ...row, s: -ROW * 2 }));
@@ -358,7 +429,7 @@ function update(dt) {
         G.flyers.push({ dept: row.dept, x: p.x, y: p.y, bay: bi, t: -l * 0.07 });
       });
     }
-    for (const f of G.funnels) if (crossed(a, b, f.sJoin) && rowEmpty(row) && f.q.length && !row.enter) {
+    for (const f of G.funnels) if (crossed(a, b, f.sJoin) && rowEmpty(row) && f.q.length && !row.enter && (!G.cfg.window || G.rows.filter(r => !rowEmpty(r)).length < G.cfg.window)) {
       const head = f.q.shift(), hp = at(f.path, head.s);
       setRow(row, head); row.enter = { x: hp.x, y: hp.y, t: 0 };
     }

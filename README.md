@@ -8,6 +8,7 @@ Ambulances are jammed in the car park. Tap one to drive it out the way its arrow
 - **Quirks:** triage-pending grey ambulances (shift 3+), flip-floppers that turn around every move (shift 5+), and the Code Blue crash cart with a move counter (shift 7+).
 - **The park:** the walkway sits in a little park with a duck pond (tap it). Tap the centre sign for the patient legend, which also pauses the shift.
 - **Cameos:** once a shift one of Becca's friends (Becca, Sarah, Jess, Carly, Katrina, Jann, Angela) walks on in green scrubs with a comment; now and then a doctor pops up with a daft request. Tap the bubble to skip.
+- **Difficulty:** from shift 3 fewer rows of patients fit on the loop at once (the rest wait in the side queues), and from shift 4 patients increasingly turn up for ambulances still buried in the jam. Both are set in `levelConfig` (`window`, `scatter`).
 - **Bays and score:** 4 bays are open and 2 are locked. Opening one costs 500 points; any left locked at the end of a shift are worth +500 each. Patients score 10 each, departures 5 per seat, a cleared shift 1,000, and the career total is saved.
 - **Levels** are generated from the shift number and always solvable: vehicles are packed, then "peeled" off in an order that is guaranteed to work, and a checker rejects any layout with head-on blocks or cycles.
 
