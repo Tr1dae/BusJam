@@ -1,8 +1,28 @@
-# Bus Jam
+# Ambulance Jam
 
-A small, ad-free bus-sorting puzzle for phones. Tap a bus to drive it out of the jam; it parks and passengers of the same colour board. Clear every bus.
+An ad-free, pixel-art traffic puzzle for phones, set at St. Becca's General.
 
-Everything is in `index.html` (plain JavaScript + canvas, no build step). Open it in a browser to play locally, or serve it with GitHub Pages.
+Ambulances are jammed in the car park. Tap one to drive it out the way its arrow points; if the road is clear it parks in a bay. Patients walk the loop four abreast, and anyone whose department's ambulance is parked steps out at the entrance and boards. Full ambulances reverse out and race off with the sirens going. Clear the lot to finish the shift.
 
-- `?level=N` in the URL jumps to a level.
-- Design notes and mechanic ideas: [docs/design-notes.md](docs/design-notes.md)
+- **Departments:** Cardiac (heart pillow), Neuro (head wrap, seeing stars), Ortho (cast and sling), Peds (teddy), Maternity (very pregnant), Burns (on fire).
+- **Quirks:** triage-pending grey ambulances (shift 3+), flip-floppers that turn around every move (shift 5+), and the Code Blue crash cart with a move counter (shift 7+).
+- **Spare bay:** one free extra bay per shift, also offered when you get stuck.
+- **Levels** are generated from the shift number and always solvable: vehicles are packed, then "peeled" off in an order that is guaranteed to work, and a checker rejects any layout with head-on blocks or cycles.
+
+## Running it
+
+No build step. Open `index.html`, or serve the folder (GitHub Pages: Settings → Pages → Deploy from branch `main`, `/ (root)`). On a phone, "Add to Home Screen" runs it full screen.
+
+`?level=N` jumps to a shift. Progress and sound settings are saved in the browser.
+
+## Code
+
+| File | What's in it |
+| --- | --- |
+| `js/sprites.js` | All pixel art as palette grids, vehicles rasterised per angle, cached canvases |
+| `js/font.js` | 3x5 and 5x7 pixel fonts |
+| `js/audio.js` | Chiptune music and sound effects synthesised with Web Audio |
+| `js/level.js` | Level generator and solvability checker |
+| `js/game.js` | Game loop, patient loop and funnels, bays, screens, input |
+
+Design notes and the blurb list are in `docs/`.
