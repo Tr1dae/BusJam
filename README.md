@@ -13,9 +13,19 @@ Coloured hospital beds are jammed in the corridor. Tap one to roll it out the wa
 - **Bays free up instantly:** as soon as a bed fills, its bay is free for the next bed while the full one reverses out.
 - **Bays and score:** 3 bays are open and 3 are locked. Opening them costs 500, then 1,000, then 1,500 points; any left locked at the end of a shift are worth +500 each. Patients score 10 each, departures 5 per seat, a cleared shift 1,000, and the career total is saved.
 
+## Between shifts
+
+Every shift is followed by a minigame, in rotation: Call Light Frenzy, Emergency Rush, Code Blue, Med Pass. Each has a start page that shows what to grab and what to avoid, can be skipped, and earns a free bay for the next shift on a clean run.
+
+- **Call Light Frenzy:** nine rooms, call lights going off. Tap red (real) calls before they time out; white ones (blankets, jello, wifi) and the doctor's favours just cost time. Three missed calls ends it.
+- **Code Blue:** a rhythm game. Tap on the beat to do compressions (100-120 bpm, synced to the audio clock), tap the bolt to shock. 90% on the beat is a clean run.
+- **Med Pass:** drag the med cup to catch the pills on the order card, which changes per patient. Tylenol is always fine; anything else is a wrong med, and three ends it.
+
+Once or twice a shift (from shift 2) a surprise break pauses play: **Coffee Pour** (hold to pour, let go on the line, three mugs) or **Pizza Defense** (slap day shift's hands away from the pizza, but not the manager's, who brings more). Break points go to the current shift. `?mini=calls|cpr|meds|coffee|pizza` jumps straight into one. Code is in `js/minis.js`.
+
 ## Emergency Rush
 
-After every second shift there's a short dash: a porter pushes the bed down pseudo-3D hospital corridors to the OR or ward double doors. Tap a lane to switch, tap your own lane to hop over low things (wet floor signs, mop buckets, spills), dodge tall ones (crash carts, beds, vending machines, strolling patients, a doctor on his phone), grab coffee (chains score more), department icons (+50; a heart also gives a life back) and the siren (a short boost that smashes through obstacles), and tap the big TURN button before each 90° corner. Three bumps ends the run; a clean run earns a free bay for the next shift. A second start page shows each pickup and obstacle with its sprite. It can be skipped. Add `?rush` to the URL to jump straight into one. Code is in `js/rush.js`.
+A short dash: a porter pushes the bed down pseudo-3D hospital corridors to the OR or ward double doors. Tap a lane to switch, tap your own lane to hop over low things (wet floor signs, mop buckets, spills), dodge tall ones (crash carts, beds, vending machines, strolling patients, a doctor on his phone), grab coffee (chains score more), department icons (+50; a heart also gives a life back) and the siren (a short boost that smashes through obstacles), and tap the big TURN button before each 90° corner. Three bumps ends the run; a clean run earns a free bay for the next shift. A second start page shows each pickup and obstacle with its sprite. It can be skipped. Add `?rush` to the URL to jump straight into one. Code is in `js/rush.js`.
 
 ## Running it
 
@@ -33,5 +43,6 @@ No build step. Open `index.html`, or serve the folder (GitHub Pages: Settings �
 | `js/level.js` | Level generator and solvability checker |
 | `js/game.js` | Game loop, patient loop and funnels, bays, screens, input |
 | `js/rush.js` | Emergency Rush corridor runner between shifts |
+| `js/minis.js` | The other minigames and mid-shift breaks |
 
 Design notes and the blurb list are in `docs/`.

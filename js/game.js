@@ -307,7 +307,7 @@ function startLevel(n) {
   level = n; try { localStorage.setItem('aj.level', n); } catch (e) {}
   const gen = generateLevel(n, LOT, tries);
   G = { n, cfg: gen.cfg, vehicles: gen.vehicles, offset: 0, rows: [], funnels: [], bays: [], open: (gen.cfg.open ?? OPEN) + freeBay, freeBays: freeBay, score: 0, shown: 0, floats: [], bonus: 0,
-        flyers: [], pops: [], over: null, moves: 0, blurb: pick(BLURBS), endLine: '', playT: 0, cameos: scheduleCameos(), cameo: null, leavers: [] };
+        flyers: [], pops: [], over: null, moves: 0, blurb: pick(BLURBS), endLine: '', playT: 0, cameos: scheduleCameos(), cameo: null, leavers: [], breaks: Minis.scheduleBreaks(n) };
   freeBay = 0;
   for (const v of G.vehicles) { v.state = 'lot'; v.px = v.x; v.py = v.y; v.revealed = !v.mystery; v.bumpT = 0; v.shake = 0; v.flipAnim = 0; }
   for (let i = 0; i < SLOTS; i++) G.bays.push({ state: 'empty', t: 0 });
@@ -409,6 +409,9 @@ function update(dt) {
   updateFx(dt);
   if (!G || screen !== 'play') return;
   updateCameo(dt);
+  // a surprise break pauses the shift (never mid-cameo or once the shift is decided)
+  const brk = G.breaks[0];
+  if (brk && G.playT >= brk.at && !G.over && !G.cameo) { G.breaks.shift(); Minis.begin(brk.kind, G.n, 'break'); return; }
   for (const v of G.vehicles) {
     if ((v.state === 'exit' || v.state === 'route') && (v.puffT = (v.puffT || 0) - dt) <= 0) { v.puffT = 0.05; rearPuff(v, 1); }
     if (v.shake > 0) v.shake = Math.max(0, v.shake - dt);
@@ -910,7 +913,7 @@ function drawCard() {
   let yy = y + 24;
   lines.forEach(l => { Font.smallCentered(ctx, l, 97, yy, '#475569'); yy += 7; });
   if (introLines.length) { yy += 4; R(x + 8, yy - 2, w - 16, introLines.length * 7 + 3, '#fff3c4'); introLines.forEach(l => { Font.smallCentered(ctx, l, 97, yy, '#7a4b00'); yy += 7; }); yy += 4; }
-  const clockIn = () => { Sound.sfx.start(); Sound.play('play'); screen = 'play'; if (G.freeBays) flash('FREE BAY FROM THE RUSH!'); };
+  const clockIn = () => { Sound.sfx.start(); Sound.play('play'); screen = 'play'; if (G.freeBays) flash('FREE BAY! YOU EARNED IT.'); };
   button('CLOCK IN', 97, y + h - 24, 80, '#22a35a', clockIn);
   addButton(0, 0, LW, LH, clockIn);
   buttons.unshift(buttons.pop()); // the specific button wins over the full-screen one
@@ -938,8 +941,8 @@ function drawEnd(won) {
     Font.smallCentered(ctx, 'SHIFT CLEAR +1,000' + (G.bonus ? '   LOCKED BAYS +' + fmt(G.bonus) : ''), 97, y + 83, '#475569');
     Font.smallCentered(ctx, 'CAREER TOTAL ' + fmt(career), 97, y + 91, '#94a3b8');
     button('NEXT SHIFT', 97, y + h - 40, 96, '#22a35a', () => { Sound.sfx.click(); Sound.play('title');
-      // every second shift is followed by an Emergency Rush
-      if (G.n % 2 === 0) Rush.begin(G.n); else { startLevel(level + 1); screen = 'card'; overlayT = 0; } });
+      // every shift is followed by a minigame, in rotation with the Emergency Rush
+      Minis.between(G.n); });
     button('REPLAY', 97, y + h - 20, 96, '#64748b', () => { Sound.sfx.click(); startLevel(level); screen = 'card'; overlayT = 0; }); }
   else { let by = y + h - (canOpen ? 40 : 20);
     if (canOpen) { button('OPEN A BAY -' + fmt(unlockCost(G.open)), 97, by, 130, '#22a35a', () => { G.over = null; unlockBay(); screen = 'play'; }); by += 20; }
@@ -984,10 +987,12 @@ cv.addEventListener('pointerdown', e => {
   const p = toArt(e);
   if (screen === 'splash') { Sound.init(); Sound.play('title'); Sound.sfx.start(); startLevel(level); screen = 'card'; overlayT = 0;
     if (/[?&]rush/.test(location.search)) Rush.begin(level);  // ?rush jumps straight into an Emergency Rush for testing
+    const mini = new URLSearchParams(location.search).get('mini'); if (mini && Minis.GAMES[mini]) Minis.begin(mini, level);  // ?mini=calls|cpr|meds|coffee|pizza
     return; }
   Sound.init();
   for (const b of buttons) if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { b.fn(); return; }
   if (screen === 'rush') { Rush.tap(p); return; }
+  if (screen === 'mini') { Minis.down(p); return; }
   if (screen !== 'play' || G.over) return;
   if (cameoTap(p)) return;
   if (p.y < LOT_TOP - 4) taps.push({ x: p.x, y: p.y, t: 0 });
@@ -1007,7 +1012,7 @@ let lastShape = null, lastScreen = null;
 let last = performance.now();
 function frame(now) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
-  update(dt); Rush.update(dt);
+  update(dt); Rush.update(dt); Minis.update(dt);
   if (G && G.cfg.shape !== lastShape) { buildPlayBg(); paintLotOutline(G.cfg.shape); lastShape = G.cfg.shape; }
   buttons = [];
   if (screen !== lastScreen) { lastScreen = screen; overlayT = 0; }
@@ -1020,10 +1025,13 @@ function frame(now) {
   else if (screen === 'lose') drawEnd(false);
   else if (screen === 'legend') drawLegend();
   else if (screen.startsWith('rush')) Rush.frame();
+  else if (screen.startsWith('mini')) Minis.frame();
   ctx.restore();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-window.AJ = { get G() { return G; }, get screen() { return screen; }, set screen(s) { screen = s; }, startLevel, tapVehicle, update, onLot, lose, unlock: unlockBay, Rush, get buttons() { return buttons; } };
+window.AJ = { get G() { return G; }, get screen() { return screen; }, set screen(s) { screen = s; }, startLevel, tapVehicle, update, onLot, lose, unlock: unlockBay, Rush, Minis, get buttons() { return buttons; } };
+cv.addEventListener('pointermove', e => { if (screen === 'mini') Minis.move(toArt(e)); });
+for (const ev of ['pointerup', 'pointercancel']) cv.addEventListener(ev, e => { if (screen === 'mini') Minis.up(toArt(e)); });
 // iOS only unlocks audio on certain gestures; make sure a touchend also tries
 addEventListener('touchend', () => Sound.init(), { passive: true });

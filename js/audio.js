@@ -76,6 +76,15 @@ const Sound = (() => {
     brew()  { noise({ dur:0.5, vol:0.08, hp:1800 }); tone({ wave:'sine', f:500, f2:700, at:0.5, dur:0.12, vol:0.1 }); },
     whirr() { tone({ wave:'pulse12', f:300, f2:1500, dur:0.5, vol:0.1 }); tone({ wave:'sine', f:1568, at:0.55, dur:0.12, vol:0.12 }); },
     start() { [64, 67, 72].forEach((m, i) => tone({ wave:'pulse25', f:mtof(m), at:i * 0.07, dur:0.1, vol:0.16 })); },
+    // minigames
+    thump() { tone({ wave:'sine', f:180, f2:60, dur:0.1, vol:0.35 }); noise({ dur:0.03, vol:0.08, hp:800 }); },
+    charge(){ tone({ wave:'sine', f:300, f2:2400, dur:0.9, vol:0.08, attack:0.05 }); },
+    zap()   { noise({ dur:0.3, vol:0.3, hp:200 }); tone({ wave:'square', f:90, f2:40, dur:0.3, vol:0.25 }); },
+    slap()  { noise({ dur:0.06, vol:0.35, hp:1200 }); tone({ wave:'square', f:240, f2:120, dur:0.05, vol:0.12 }); },
+    pour()  { noise({ dur:0.12, vol:0.05, hp:2500 }); },
+    ding()  { tone({ wave:'sine', f:1568, dur:0.4, vol:0.14 }); tone({ wave:'sine', f:2093, at:0.08, dur:0.4, vol:0.1 }); },
+    pill(i) { tone({ wave:'triangle', f:mtof(PENT[Math.min(i, PENT.length - 1)] + 12), dur:0.06, vol:0.22 }); noise({ dur:0.02, vol:0.08, hp:5000 }); },
+    callbell(){ tone({ wave:'sine', f:880, dur:0.12, vol:0.1 }); tone({ wave:'sine', f:660, at:0.14, dur:0.14, vol:0.1 }); },
   };
 
   // ---------- music: step sequencer, eighth-note steps ----------
@@ -99,10 +108,22 @@ const Sound = (() => {
       bass: [40,52,40,52, 40,52,40,52,  36,48,36,48, 36,48,36,48,  38,50,38,50, 38,50,38,50,  43,55,43,55, 47,59,47,59,
              40,52,40,52, 40,52,40,52,  36,48,36,48, 36,48,36,48,  38,50,38,50, 43,55,43,55,  40,52,47,52, 40,_,40,_],
       drums:'k.hsk.hsk.hsk.hs' },
+    // Code Blue: four on the floor, octave disco bass; the bpm is set per game (100-120, CPR rate)
+    cpr: { bpm: 108,
+      lead: [_,_,69,_, 72,_,69,67,  _,_,69,_, 72,74,72,_,  _,_,69,_, 72,_,76,74,  72,_,69,_, 67,_,_,_,
+             _,_,76,_, 79,_,76,74,  _,_,72,_, 74,76,74,_,  _,_,69,_, 72,_,74,72,  69,_,67,_, 69,_,_,_],
+      bass: [45,57,45,57, 45,57,45,57,  43,55,43,55, 43,55,43,55,  41,53,41,53, 41,53,41,53,  40,52,40,52, 43,55,43,55,
+             45,57,45,57, 45,57,45,57,  43,55,43,55, 43,55,43,55,  41,53,41,53, 41,53,41,53,  40,52,44,56, 45,57,45,_],
+      drums:'khshkhsh' },
+    // little break-room loop for the mid-shift breaks
+    break: { bpm: 104,
+      lead: [79,_,76,_, 72,_,76,79,  81,_,79,_, 76,_,_,_,  77,_,74,_, 71,_,74,77,  79,_,77,76, 74,_,_,_],
+      bass: [48,_,55,_, 52,_,55,_,  53,_,57,_, 60,_,57,_,  50,_,57,_, 53,_,57,_,  55,_,59,_, 62,_,59,_],
+      drums:'k.h.s.h.' },
   };
-  let current = null, step = 0, nextTime = 0, timer = null;
+  let current = null, step = 0, nextTime = 0, timer = null, bpmOver = 0, songStart = 0;
   function scheduleStep(song, i, t) {
-    const len = song.lead.length, spb = 60 / song.bpm / 2;
+    const len = song.lead.length, spb = 60 / (bpmOver || song.bpm) / 2;
     const l = song.lead[i % len], b = song.bass[i % len], d = song.drums[i % song.drums.length];
     if (l != null) {
       const o = ctx.createOscillator(), g = ctx.createGain(); o.setPeriodicWave(pulse25);
@@ -124,18 +145,22 @@ const Sound = (() => {
   }
   function tick() {
     if (!ctx || !current) return;
-    const song = SONGS[current], spb = 60 / song.bpm / 2;
+    const song = SONGS[current], spb = 60 / (bpmOver || song.bpm) / 2;
     while (nextTime < ctx.currentTime + 0.15) { scheduleStep(song, step, nextTime); step++; nextTime += spb; }
   }
-  function play(name) {
-    if (!ctx || current === name) return;
-    current = name; step = 0; nextTime = ctx.currentTime + 0.05;
+  function play(name, bpm) {
+    if (!ctx || (current === name && !bpm)) return;
+    current = name; step = 0; nextTime = ctx.currentTime + 0.05; bpmOver = bpm || 0; songStart = nextTime;
     if (!timer) timer = setInterval(tick, 40);
   }
   function stop() { current = null; }
 
   return {
-    init, play, stop, sfx: new Proxy(sfx, { get: (o, k) => (...a) => { if (ctx && prefs.sfx) o[k](...a); } }),
+    init, play, stop,
+    // the audio clock, for rhythm games; null when audio isn't running
+    clock() { return ctx && ctx.state === 'running' ? ctx.currentTime : null; },
+    get songStart() { return songStart; },
+    sfx: new Proxy(sfx, { get: (o, k) => (...a) => { if (ctx && prefs.sfx) o[k](...a); } }),
     get music() { return prefs.music; }, get effects() { return prefs.sfx; },
     toggleMusic() { prefs.music = !prefs.music; save(); if (musicBus) musicBus.gain.value = prefs.music ? 0.16 : 0; },
     toggleSfx() { prefs.sfx = !prefs.sfx; save(); if (sfxBus) sfxBus.gain.value = prefs.sfx ? 0.45 : 0; },
