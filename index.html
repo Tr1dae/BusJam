@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#cfd6e0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Bus Jam</title>
+<style>
+  :root { --bg:#cfd6e0; }
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;touch-action:none;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh;height:100dvh}
+  #hud{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;display:flex;
+    justify-content:space-between;align-items:center;padding:8px 12px;pointer-events:none}
+  .pill{pointer-events:auto;background:rgba(255,255,255,.9);border-radius:999px;padding:7px 14px;
+    font-weight:800;color:#334155;box-shadow:0 2px 6px rgba(0,0,0,.15);border:none;font-size:15px;font-family:inherit}
+  #overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(15,23,42,.45);padding:16px}
+  .card{background:#fff;border-radius:20px;padding:22px 24px;text-align:center;width:100%;max-width:320px;
+    box-shadow:0 10px 30px rgba(0,0,0,.3)}
+  .card h2{margin:0 0 8px;font-size:24px;color:#0f172a}
+  .card p{margin:0 0 14px;color:#475569;line-height:1.4}
+  .card button{display:block;width:100%;margin-top:10px;padding:13px;border:none;border-radius:12px;
+    font-size:18px;font-weight:800;background:#3b82f6;color:#fff;font-family:inherit}
+  .card button.alt{background:#e2e8f0;color:#334155}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="hud">
+  <button class="pill" id="lvl">Level 1</button>
+  <button class="pill" id="restart" aria-label="Restart level">↻ Restart</button>
+</div>
+<div id="overlay"><div class="card" id="card"></div></div>
+<script>
+"use strict";
+// ---------- constants ----------
+const COLORS = [
+  { body:'#ef4444', dark:'#b91c1c' }, // red
+  { body:'#3b82f6', dark:'#1d4ed8' }, // blue
+  { body:'#facc15', dark:'#ca8a04' }, // yellow
+  { body:'#22c55e', dark:'#15803d' }, // green
+  { body:'#a855f7', dark:'#7e22ce' }, // purple
+  { body:'#fb923c', dark:'#c2410c' }, // orange
+  { body:'#f472b6', dark:'#be185d' }, // pink
+];
+const SIZES = [ { cap:4, len:7 }, { cap:6, len:9.5 }, { cap:8, len:12 } ];
+const BUS_W = 4.4;           // world units
+const R = 40;                // board radius in world units
+const OPEN_SLOTS = 5;        // free parking spots
+const SLOT_COUNT = 6;        // + one bonus spot, free once per level
+const SPEED = 130;           // world units / s on the board
+const BOARD_INTERVAL = 0.06; // seconds between passengers boarding
+
+// ---------- helpers ----------
+function rng(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed);
+  t=t+Math.imul(t^t>>>7,61|t)^t; return((t^t>>>14)>>>0)/4294967296; }; }
+const lerp=(a,b,t)=>a+(b-a)*t;
+const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+const angDiff=(a,b)=>{ let d=(b-a)%(Math.PI*2); if(d>Math.PI)d-=Math.PI*2; if(d<-Math.PI)d+=Math.PI*2; return d; };
+
+function corners(cx,cy,ang,hl,hw){ const c=Math.cos(ang),s=Math.sin(ang);
+  return [[cx+c*hl-s*hw,cy+s*hl+c*hw],[cx+c*hl+s*hw,cy+s*hl-c*hw],[cx-c*hl+s*hw,cy-s*hl-c*hw],[cx-c*hl-s*hw,cy-s*hl+c*hw]]; }
+function sat(A,B){
+  for(const P of [A,B]) for(let i=0;i<2;i++){
+    const p=P[i],q=P[i+1], ax=p[1]-q[1], ay=q[0]-p[0];
+    let a0=Infinity,a1=-Infinity,b0=Infinity,b1=-Infinity;
+    for(const v of A){const d=v[0]*ax+v[1]*ay; if(d<a0)a0=d; if(d>a1)a1=d;}
+    for(const v of B){const d=v[0]*ax+v[1]*ay; if(d<b0)b0=d; if(d>b1)b1=d;}
+    if(a1<=b0||b1<=a0) return false;
+  }
+  return true;
+}
+const busBox=(b,pad=0,dx=0,dy=0)=>corners(b.x+dx,b.y+dy,b.ang,b.len/2+pad,BUS_W/2+pad);
+// rectangle covering the bus and everything ahead of it along `ang`
+function sweepBox(b,ang,dist=2*R+30){ const c=Math.cos(ang),s=Math.sin(ang);
+  return corners(b.x+c*dist/2,b.y+s*dist/2,ang,b.len/2+dist/2-0.05,BUS_W/2-0.15); }
+function pathClear(b,ang,others){ const sw=sweepBox(b,ang);
+  for(const o of others){ if(o!==b && sat(sw,busBox(o,-0.05))) return false; } return true; }
+
+// ---------- level design ----------
+const SHAPES = [
+  (x,y)=>Math.hypot(x,y)<=R,                         // circle
+  (x,y)=>Math.abs(x)+Math.abs(y)<=R*1.18,            // diamond
+  (x,y)=>Math.max(Math.abs(x),Math.abs(y))<=R*0.82,  // square
+  (x,y)=>{ const a=Math.abs(x),b=Math.abs(y); return b<=R*0.86 && a*0.5+b*0.866<=R*0.86 && Math.hypot(x,y)<=R; }, // hex
+];
+function levelCfg(n){
+  return {
+    buses: Math.min(20 + n*5, 95),
+    colors: Math.min(3 + Math.floor((n-1)/2), 7),
+    dirs: n < 3 ? 4 : 8,
+    sizes: n < 2 ? [1,1,0] : [1,1.2,0.8],
+    mystery: n >= 3 ? Math.min(0.12 + 0.02*(n-3), 0.32) : 0,
+    flip: n >= 5 ? Math.min(0.10 + 0.01*(n-5), 0.2) : 0,
+    ambulance: n >= 7,
+    ambTimer: 7,
+    mix: Math.min(0.25 + n*0.04, 0.75),
+    shape: SHAPES[(n-1) % SHAPES.length],
+  };
+}
+const INTROS = {
+  1: ['Bus Jam', 'Tap a bus to drive it the way its arrow points. If nothing is in the way it parks at the top, and passengers of the same colour hop on. Full buses leave. Clear every bus!'],
+  3: ['Mystery buses', 'Grey buses with a “?” hide their colour until the road ahead of them is clear.'],
+  5: ['Flip buses', 'Buses marked ⇄ turn around every time you send another bus away. Time it right!'],
+  7: ['Ambulance', 'The ambulance must get out before its counter hits zero. Each bus you send away counts down by one.'],
+};
+
+// Generator: pack buses densely, then "peel" them: repeatedly pick a bus whose
+// road out is clear, point it that way and lift it off. Peel order is a
+// guaranteed solution, and the passenger queue is built from it.
+function generate(n){
+  const r = rng(n*9973 + 17), cfg = levelCfg(n);
+  const axes = Array.from({length:cfg.dirs/2},(_,i)=>i*Math.PI*2/cfg.dirs);
+  const sw = cfg.sizes, swSum = sw.reduce((a,b)=>a+b,0);
+  const pickSize = ()=>{ let x=r()*swSum; for(let i=0;i<sw.length;i++){ x-=sw[i]; if(x<0) return SIZES[i]; } return SIZES[0]; };
+  // 1. dense random packing (orientation only, no direction yet)
+  const packed = [];
+  for(let a=0; a<25000 && packed.length<cfg.buses; a++){
+    const sz = pickSize(); let b;
+    if(packed.length && r()<0.75){
+      // grow a neat block: park right beside (or nose-to-tail with) an existing bus
+      const p = packed[Math.floor(r()*packed.length)], c = Math.cos(p.ang), s = Math.sin(p.ang);
+      const side = r()<0.7, sg = r()<0.5 ? -1 : 1;
+      const d = side ? BUS_W+0.3 : (p.len+sz.len)/2+0.3, slide = side ? (sz.len-p.len)/2*(r()<0.5?-1:1)*(r()<0.5?1:0) : 0;
+      b = side ? { x:p.x - s*d*sg + c*slide, y:p.y + c*d*sg + s*slide } : { x:p.x + c*d*sg, y:p.y + s*d*sg };
+      b.ang = p.ang;
+    } else {
+      const t = r()*Math.PI*2, rad = Math.sqrt(r())*R;
+      b = { x:Math.round(Math.cos(t)*rad*2)/2, y:Math.round(Math.sin(t)*rad*2)/2, ang:axes[Math.floor(r()*axes.length)] };
+    }
+    b.len = sz.len; b.cap = sz.cap;
+    if(!busBox(b).every(([x,y])=>cfg.shape(x,y))) continue;
+    const box = busBox(b, 0.2);
+    if(packed.some(p=>sat(box, busBox(p)))) continue;
+    packed.push(b);
+  }
+  // 2. peel
+  const left = packed.slice(), order = [];
+  while(left.length){
+    const opts = [];
+    for(const b of left){
+      const f = pathClear(b, b.ang, left), k = pathClear(b, b.ang+Math.PI, left);
+      if(f||k) opts.push({b,f,k});
+    }
+    if(!opts.length){ left.splice(Math.floor(r()*left.length),1); continue; } // break a deadlock by deleting a bus
+    const o = opts[Math.floor(r()*opts.length)], b = o.b;
+    if(o.f && o.k){ if(r()<0.5) b.ang += Math.PI; b.flip = r() < cfg.flip*2; }
+    else if(o.k) b.ang += Math.PI;
+    b.flip = !!b.flip; b.kind = 'bus';
+    order.push(b); left.splice(left.indexOf(b),1);
+  }
+  // an early-peeled bus becomes the ambulance (reachable within a few moves)
+  if(cfg.ambulance && order.length > 6){ const a = order[2 + Math.floor(r()*3)]; a.kind='amb'; a.cap=0; a.flip=false; }
+  order.forEach((b,i)=>{ b.id=i; if(b.kind==='bus'){ b.color=Math.floor(r()*cfg.colors); b.mystery = r()<cfg.mystery; } });
+
+  // 3. passenger queue in solution order, neighbouring groups lightly interleaved
+  const groups = order.filter(b=>b.kind==='bus').map(b=>Array(b.cap).fill(b.color));
+  const q = [];
+  for(let i=0;i<groups.length;i++){
+    if(i+1<groups.length && r()<cfg.mix){
+      const a=groups[i], c=groups[i+1];
+      while(a.length||c.length){ const src=(!c.length||(a.length&&r()<0.5))?a:c; const k=1+Math.floor(r()*3);
+        for(let j=0;j<k&&src.length;j++) q.push(src.pop()); }
+      i++;
+    } else q.push(...groups[i]);
+  }
+  return { buses:order, queue:q, cfg };
+}
+
+// ---------- state ----------
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+let W,H,L={}, level=1, G=null, toast=null;
+try{ level = parseInt(new URLSearchParams(location.search).get('level')) || parseInt(localStorage.getItem('busjam.level')) || 1; }catch(e){}
+
+function startLevel(n){
+  level = n; try{ localStorage.setItem('busjam.level', n); }catch(e){}
+  document.getElementById('lvl').textContent = 'Level ' + n;
+  const g = generate(n);
+  G = { buses:g.buses, cfg:g.cfg, slots:Array(SLOT_COUNT).fill(null), open:OPEN_SLOTS, bonusUsed:false,
+        queue:g.queue.map((c,i)=>({c,d:i*L.spacing})), flyers:[], boardT:0, over:false, time:0 };
+  for(const b of G.buses){ b.state='board'; b.dist=0; b.revealed=!b.mystery; b.bumpT=0; b.shake=0; b.flipAnim=0;
+    if(b.kind==='amb') b.timer=g.cfg.ambTimer; }
+  revealCheck();
+  hideOverlay();
+  if(INTROS[n]) showOverlay(INTROS[n][0], INTROS[n][1], [['Play', hideOverlay]]);
+}
+const onBoard=()=>G.buses.filter(b=>b.state==='board');
+function revealCheck(){ const ob=onBoard(); for(const b of ob) if(!b.revealed && pathClear(b,b.ang,ob)) b.revealed=true; }
+
+// ---------- layout ----------
+function layout(){
+  W=innerWidth; H=innerHeight; const dpr=Math.min(devicePixelRatio||1, 2.5);
+  cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); ctx.setTransform(dpr,0,0,dpr,0,0);
+  const gw=Math.min(W, H*0.62), ox=(W-gw)/2, hud=52, topH=Math.round(H*0.40);
+  const gap=8, slotW=Math.min((gw-24)/SLOT_COUNT-gap, 58), slotH=slotW*1.55;
+  const parkY=topH-slotH/2-24, tot=SLOT_COUNT*slotW+(SLOT_COUNT-1)*gap, sx=ox+(gw-tot)/2+slotW/2;
+  L = { ox, gw, topH, slotW, slotH, parkY, slotScale:slotH*0.86/12,
+        slotX:i=>sx+i*(slotW+gap), door:{x:ox+gw/2, y:parkY-slotH/2-12} };
+  // people walk a spiral that ends at the door above the parking row
+  const top=hud+4, bot=L.door.y-14, cx=ox+gw/2, cy=(top+bot)/2, rx=gw*0.45, ry=Math.max((bot-top)/2-4, 20);
+  const pts=[[L.door.x,L.door.y],[cx,cy+ry]];
+  const turns=2.2, kMin=0.28, N=500;
+  for(let i=1;i<=N;i++){ const u=i/N, th=Math.PI/2+u*turns*Math.PI*2, k=1-u*(1-kMin);
+    pts.push([cx+rx*k*Math.cos(th), cy+ry*k*Math.sin(th)]); }
+  const cum=[0]; for(let i=1;i<pts.length;i++) cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
+  L.path=pts; L.cum=cum; L.pathLen=cum[cum.length-1];
+  L.pr=Math.max(4, Math.min(8, Math.min(gw,H)/66)); L.spacing=L.pr*2.15;
+  // board
+  const bt=topH+10, bb=H-12;
+  L.s=Math.min((gw-12)/(2*R+4), (bb-bt)/(2*R+4)); L.bcx=ox+gw/2; L.bcy=(bt+bb)/2;
+  if(G) G.queue.forEach((p,i)=>p.d=i*L.spacing);
+}
+function pathAt(d){ const c=L.cum; let lo=0,hi=c.length-1; if(d<=0) return L.path[0]; if(d>=c[hi]) return L.path[hi];
+  while(hi-lo>1){ const m=(lo+hi)>>1; if(c[m]<d) lo=m; else hi=m; }
+  const t=(d-c[lo])/(c[hi]-c[lo]); return [lerp(L.path[lo][0],L.path[hi][0],t), lerp(L.path[lo][1],L.path[hi][1],t)]; }
+const toScreen=(x,y)=>[L.bcx+x*L.s, L.bcy+y*L.s];
+const slotPos=i=>[L.slotX(i), L.parkY];
+
+// ---------- input ----------
+cv.addEventListener('pointerdown', e=>{
+  if(!G || G.over || overlayOpen) return;
+  const px=e.clientX, py=e.clientY;
+  // bonus parking spot
+  for(let i=G.open;i<SLOT_COUNT;i++){ const [x,y]=slotPos(i);
+    if(Math.abs(px-x)<L.slotW/2+4 && Math.abs(py-y)<L.slotH/2+4){ useBonus(); return; } }
+  const wx=(px-L.bcx)/L.s, wy=(py-L.bcy)/L.s; let best=null, bd=Infinity;
+  for(const b of onBoard()){ const c=Math.cos(-b.ang), s=Math.sin(-b.ang), lx=(wx-b.x)*c-(wy-b.y)*s, ly=(wx-b.x)*s+(wy-b.y)*c;
+    if(Math.abs(lx)<=b.len/2+0.8 && Math.abs(ly)<=BUS_W/2+0.8){ const d=Math.hypot(wx-b.x,wy-b.y); if(d<bd){bd=d;best=b;} } }
+  if(best) tapBus(best);
+});
+function useBonus(){ if(G.bonusUsed) { flash('Bonus spot already used'); return false; }
+  G.bonusUsed=true; G.open=SLOT_COUNT; flash('Extra parking spot unlocked!'); return true; }
+function buzz(ms){ try{ navigator.vibrate && navigator.vibrate(ms); }catch(e){} }
+
+function tapBus(b){
+  const others=onBoard();
+  if(!pathClear(b,b.ang,others)){
+    // drive forward until contact, then bounce back
+    const c=Math.cos(b.ang), s=Math.sin(b.ang); let d=0, hit=null;
+    for(; d<2*R+30 && !hit; d+=0.25){ const box=busBox(b,-0.05,c*d,s*d); for(const o of others) if(o!==b && sat(box,busBox(o,-0.05))){ hit=o; break; } }
+    b.bumpDist=Math.max(0,d-0.5); b.bumpT=0.001; if(hit) hit.shake=0.3; buzz(25); return;
+  }
+  if(b.kind==='amb'){ b.state='exiting'; b.revealed=true; afterMove(b); return; }
+  let slot=-1; for(let i=0;i<G.open;i++) if(!G.slots[i]){ slot=i; break; }
+  if(slot<0){ b.shake=0.3; flash('No free parking spot!'); buzz(40); return; }
+  G.slots[slot]=b; b.slot=slot; b.state='exiting'; b.revealed=true; b.filled=0; b.reserved=0;
+  afterMove(b);
+}
+function afterMove(moved){
+  for(const b of onBoard()){
+    if(b.flip){ b.ang+=Math.PI; b.flipAnim=1; }
+    if(b.kind==='amb' && moved!==b){ b.timer--; if(b.timer<=0){ lose('The ambulance got stuck!'); return; } }
+  }
+  revealCheck();
+}
+
+// ---------- update ----------
+function update(dt){
+  if(!G) return; G.time+=dt;
+  for(const b of G.buses){
+    if(b.shake>0) b.shake=Math.max(0,b.shake-dt);
+    if(b.flipAnim>0) b.flipAnim=Math.max(0,b.flipAnim-dt*4);
+    if(b.state==='board' && b.bumpT>0){ b.bumpT+=dt/0.32; if(b.bumpT>=1) b.bumpT=0; }
+    else if(b.state==='exiting'){
+      b.dist+=SPEED*dt; const x=b.x+Math.cos(b.ang)*b.dist, y=b.y+Math.sin(b.ang)*b.dist;
+      if(b.kind==='amb'){ if(Math.hypot(x,y)>R+40) b.state='gone'; }
+      else if(Math.hypot(x,y)>R+b.len/2+2){
+        const [sx,sy]=toScreen(x,y); b.from={x:sx,y:sy,a:b.ang,s:L.s}; b.t=0; b.state='toSlot'; }
+    } else if(b.state==='toSlot'){ b.t+=dt/0.45; if(b.t>=1){ b.state='parked'; b.parkedAt=G.time; } }
+    else if(b.state==='leaving'){ b.t+=dt/0.6; if(b.t>=1) b.state='gone'; }
+  }
+  // passengers glide along the path
+  const step=260*dt;
+  G.queue.forEach((p,i)=>{ const tgt=i*L.spacing; p.d = p.d>tgt ? Math.max(tgt,p.d-step) : tgt; });
+  // boarding
+  G.boardT-=dt;
+  if(G.boardT<=0 && G.queue.length && G.queue[0].d<L.spacing*0.6){
+    const c=G.queue[0].c; let bus=null;
+    for(const s of G.slots) if(s && s.state==='parked' && s.color===c && s.reserved<s.cap && (!bus||s.parkedAt<bus.parkedAt)) bus=s;
+    if(bus){ G.queue.shift(); bus.reserved++; const [hx,hy]=pathAt(0); G.flyers.push({c,x:hx,y:hy,bus,t:0}); G.boardT=BOARD_INTERVAL; }
+  }
+  for(const f of G.flyers){ f.t+=dt/0.18; if(f.t>=1){ f.done=true; f.bus.filled++;
+    if(f.bus.filled>=f.bus.cap){ const b=f.bus; b.state='leaving'; b.t=0; G.slots[b.slot]=null; } } }
+  G.flyers=G.flyers.filter(f=>!f.done);
+  // win / lose
+  if(G.over) return;
+  const busy=G.flyers.length||G.buses.some(b=>b.state==='exiting'||b.state==='toSlot'||b.state==='leaving'||b.bumpT>0);
+  if(busy) return;
+  if(!G.queue.length && G.buses.every(b=>b.state==='gone')){ win(); return; }
+  if(G.queue.length){
+    let full=true; for(let i=0;i<G.open;i++) if(!G.slots[i]) full=false;
+    const c=G.queue[0].c, match=G.slots.some(s=>s&&s.color===c&&s.reserved<s.cap);
+    if(full && !match) lose('Parking is full and nobody can board.');
+  }
+}
+function win(){ G.over=true; setTimeout(()=>showOverlay('Level '+level+' cleared!','Every bus is on its way.',[['Next level',()=>startLevel(level+1)],['Replay',()=>startLevel(level),'alt']]),400); }
+function lose(msg){ G.over=true;
+  const btns=[['Try again',()=>startLevel(level)]];
+  if(!G.bonusUsed && msg.startsWith('Parking')) btns.unshift(['Use extra spot',()=>{ G.over=false; useBonus(); hideOverlay(); }]);
+  setTimeout(()=>showOverlay('Stuck!',msg,btns),300); }
+
+// ---------- drawing ----------
+function rr(x,y,w,h,r){ ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x,y,w,h,r) : ctx.rect(x,y,w,h); }
+function drawBus(b,px,py,ang,sc){
+  const len=b.len*sc, w=BUS_W*sc, amb=b.kind==='amb', hidden=!b.revealed;
+  const col = amb ? {body:'#f8fafc',dark:'#cbd5e1'} : hidden ? {body:'#94a3b8',dark:'#64748b'} : COLORS[b.color];
+  let shk = b.shake>0 ? Math.sin(b.shake*60)*b.shake*1.2*sc : 0;
+  ctx.save(); ctx.translate(px+shk,py); ctx.rotate(ang);
+  ctx.fillStyle='rgba(15,23,42,.22)'; rr(-len/2+sc*.3,-w/2+sc*.7,len,w,w*.28); ctx.fill();
+  ctx.fillStyle=col.dark; rr(-len/2,-w/2,len,w,w*.28); ctx.fill();
+  ctx.fillStyle=col.body; rr(-len/2+sc*.35,-w/2+sc*.35,len-sc*.7,w-sc*.7,w*.22); ctx.fill();
+  // windshield (front = +x) and side windows
+  ctx.fillStyle='rgba(30,41,59,.7)'; rr(len/2-w*.55,-w*.36,w*.28,w*.72,w*.08); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.35)'; rr(-len/2+w*.3,-w*.44,len-w*1.1,w*.1,w*.05); ctx.fill(); rr(-len/2+w*.3,w*.34,len-w*1.1,w*.1,w*.05); ctx.fill();
+  if(amb){ ctx.fillStyle='#ef4444'; const k=w*.13; ctx.fillRect(-len*.18-k*2.5,-k*.6,k*5,k*1.2); ctx.fillRect(-len*.18-k*.6,-k*2.5,k*1.2,k*5);
+    ctx.fillStyle=(Math.floor(G.time*4)%2)?'#ef4444':'#3b82f6'; ctx.fillRect(len*.05,-w*.3,w*.12,w*.6); }
+  // arrow
+  if(b.state==='board' || b.state==='exiting'){
+    ctx.save(); if(b.flipAnim>0) ctx.rotate(Math.PI*b.flipAnim);
+    ctx.fillStyle='#fff'; ctx.strokeStyle='rgba(15,23,42,.25)'; ctx.lineWidth=Math.max(1,sc*.15);
+    const ax=amb?len*.3:0, aw=Math.min(len*.32,w*.85);
+    ctx.beginPath(); ctx.moveTo(ax+aw*.6,0); ctx.lineTo(ax,-w*.3); ctx.lineTo(ax,-w*.12); ctx.lineTo(ax-aw*.6,-w*.12);
+    ctx.lineTo(ax-aw*.6,w*.12); ctx.lineTo(ax,w*.12); ctx.lineTo(ax,w*.3); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+  // un-rotated badges
+  const fs=Math.max(9, w*.62);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  if(b.state==='board'){
+    if(hidden){ badge(px,py-w*.05,'?',fs*1.1,'#334155','#fff'); }
+    if(b.flip){ badge(px-Math.cos(ang)*len*.32, py-Math.sin(ang)*len*.32, '⇄', fs*.8, '#0f172a', '#fde047'); }
+    if(amb){ badge(px-Math.cos(ang)*len*.22, py-Math.sin(ang)*len*.22, String(b.timer), fs, b.timer<=2?'#fff':'#0f172a', b.timer<=2?'#ef4444':'#fde047'); }
+  }
+}
+function badge(x,y,txt,fs,fg,bg){ ctx.font=`900 ${fs}px system-ui,sans-serif`; const r=fs*.62;
+  ctx.fillStyle=bg; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.fillStyle=fg; ctx.fillText(txt,x,y+fs*.04); }
+function person(x,y,c,r){ ctx.fillStyle='rgba(15,23,42,.18)'; ctx.beginPath(); ctx.ellipse(x,y+r*.55,r,r*.5,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=COLORS[c].dark; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=COLORS[c].body; ctx.beginPath(); ctx.arc(x,y-r*.3,r*.68,0,Math.PI*2); ctx.fill(); }
+
+function draw(){
+  ctx.fillStyle='#cfd6e0'; ctx.fillRect(0,0,W,H);
+  if(!G) return;
+  // top plaza
+  ctx.fillStyle='#e7ebf0'; ctx.fillRect(0,0,W,L.topH);
+  ctx.strokeStyle='#d6dce4'; ctx.lineWidth=1;
+  for(let x=L.ox%28;x<W;x+=28){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,L.topH); ctx.stroke(); }
+  for(let y=0;y<L.topH;y+=28){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  // walkway
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.strokeStyle='#ffffff'; ctx.lineWidth=L.pr*3.4; ctx.beginPath(); L.path.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.stroke();
+  ctx.strokeStyle='#9aa6b6'; ctx.lineWidth=L.pr*2.6; ctx.stroke();
+  // parking strip
+  const stripTop=L.parkY-L.slotH/2-10;
+  ctx.fillStyle='#64748b'; rr(L.ox+6,stripTop,L.gw-12,L.topH-stripTop-4,14); ctx.fill();
+  for(let i=0;i<SLOT_COUNT;i++){ const [x,y]=slotPos(i), lockd=i>=G.open;
+    ctx.setLineDash(lockd?[5,4]:[]); ctx.strokeStyle=lockd?'#94a3b8':'#cbd5e1'; ctx.lineWidth=2;
+    ctx.fillStyle=lockd?'#475569':'#56657a'; rr(x-L.slotW/2,y-L.slotH/2,L.slotW,L.slotH,8); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+    if(lockd){ ctx.fillStyle=G.bonusUsed?'#64748b':'#4ade80'; ctx.font=`900 ${L.slotW*.6}px system-ui`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('+',x,y); } }
+  // board area
+  ctx.fillStyle='#bfc8d4'; ctx.fillRect(0,L.topH,W,3);
+  // people (draw tail first so the head is on top)
+  const vis=[]; for(const p of G.queue){ if(p.d>L.pathLen-L.spacing*1.5) break; vis.push(p); }
+  for(let i=vis.length-1;i>=0;i--){ const [x,y]=pathAt(vis[i].d); person(x,y,vis[i].c,L.pr); }
+  const hiddenCount=G.queue.length-vis.length;
+  if(hiddenCount>0){ const [x,y]=pathAt(L.pathLen); badge(x,y,'+'+hiddenCount, L.pr*1.6,'#fff','#334155'); }
+  // parked / arriving / leaving buses
+  for(const b of G.buses){
+    if(b.state==='parked'){ const [x,y]=slotPos(b.slot); drawBus(b,x,y,-Math.PI/2,L.slotScale);
+      const left=b.cap-b.filled; ctx.font=`800 ${Math.max(11,L.slotW*.28)}px system-ui`; const tw=ctx.measureText(left).width+14;
+      ctx.fillStyle=COLORS[b.color].body; rr(x-tw/2,y+L.slotH/2+3,tw,17,8); ctx.fill(); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(left,x,y+L.slotH/2+12); }
+  }
+  // board buses
+  for(const b of G.buses){ if(b.state!=='board') continue;
+    let off=0; if(b.bumpT>0) off=b.bumpDist*Math.sin(Math.PI*b.bumpT);
+    const [x,y]=toScreen(b.x+Math.cos(b.ang)*off,b.y+Math.sin(b.ang)*off); drawBus(b,x,y,b.ang,L.s); }
+  // moving buses on top
+  for(const b of G.buses){
+    if(b.state==='exiting'){ const [x,y]=toScreen(b.x+Math.cos(b.ang)*b.dist,b.y+Math.sin(b.ang)*b.dist); drawBus(b,x,y,b.ang,L.s); }
+    else if(b.state==='toSlot'){ const [tx,ty]=slotPos(b.slot), t=ease(Math.min(1,b.t));
+      drawBus(b,lerp(b.from.x,tx,t),lerp(b.from.y,ty,t),b.from.a+angDiff(b.from.a,-Math.PI/2)*t,lerp(b.from.s,L.slotScale,t)); }
+    else if(b.state==='leaving'){ const [sx,sy]=slotPos(b.slot), t=b.t*b.t;
+      drawBus(b,sx,lerp(sy,-L.slotH,t),-Math.PI/2,L.slotScale); }
+  }
+  for(const f of G.flyers){ const [tx,ty]=slotPos(f.bus.slot), t=f.t; person(lerp(f.x,tx,t),lerp(f.y,ty,t)-Math.sin(Math.PI*t)*12,f.c,L.pr*0.9); }
+  if(toast && toast.t>0){ ctx.globalAlpha=Math.min(1,toast.t*3); ctx.font='800 16px system-ui'; const tw=ctx.measureText(toast.msg).width+28;
+    ctx.fillStyle='rgba(15,23,42,.85)'; rr(W/2-tw/2,L.topH+14,tw,34,17); ctx.fill(); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(toast.msg,W/2,L.topH+31); ctx.globalAlpha=1; }
+}
+function flash(msg){ toast={msg,t:1.4}; }
+
+// ---------- overlay ----------
+let overlayOpen=false;
+function showOverlay(title,text,buttons){ const card=document.getElementById('card'); card.innerHTML='';
+  const h=document.createElement('h2'); h.textContent=title; card.appendChild(h);
+  const p=document.createElement('p'); p.textContent=text; card.appendChild(p);
+  for(const [label,fn,cls] of buttons){ const b=document.createElement('button'); b.textContent=label; if(cls) b.className=cls; b.onclick=fn; card.appendChild(b); }
+  document.getElementById('overlay').style.display='flex'; overlayOpen=true; }
+function hideOverlay(){ document.getElementById('overlay').style.display='none'; overlayOpen=false; }
+document.getElementById('restart').onclick=()=>startLevel(level);
+document.getElementById('lvl').onclick=()=>showOverlay('Level '+level,'Pick where to go.',[
+  ['Restart level',()=>startLevel(level)], ['Previous level',()=>startLevel(Math.max(1,level-1)),'alt'], ['Close',hideOverlay,'alt']]);
+
+// ---------- loop ----------
+let last=performance.now();
+function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(toast) toast.t-=dt; update(dt); draw(); requestAnimationFrame(frame); }
+addEventListener('resize', layout);
+layout(); startLevel(level); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
