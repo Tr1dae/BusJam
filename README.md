@@ -13,6 +13,10 @@ Coloured hospital beds are jammed in the corridor. Tap one to roll it out the wa
 - **Bays free up instantly:** as soon as a bed fills, its bay is free for the next bed while the full one reverses out.
 - **Bays and score:** 3 bays are open and 3 are locked. Opening them costs 500, then 1,000, then 1,500 points; any left locked at the end of a shift are worth +500 each. Patients score 10 each, departures 5 per seat, a cleared shift 1,000, and the career total is saved.
 
+## Emergency Rush
+
+After every second shift there's a short dash: a porter pushes the bed down pseudo-3D hospital corridors to the OR or ward double doors. Tap a lane to switch, tap your own lane to hop over low things (wet floor signs, mop buckets, spills), dodge tall ones (crash carts, beds, vending machines, strolling patients, a doctor on his phone), grab coffee and department icons, and tap the big TURN button before each 90° corner. Three bumps ends the run; a clean run earns a free bay for the next shift. It can be skipped. Add `?rush` to the URL to jump straight into one. Code is in `js/rush.js`.
+
 ## Running it
 
 No build step. Open `index.html`, or serve the folder (GitHub Pages: Settings → Pages → Deploy from branch `main`, `/ (root)`). On a phone, "Add to Home Screen" runs it full screen.
@@ -28,5 +32,6 @@ No build step. Open `index.html`, or serve the folder (GitHub Pages: Settings �
 | `js/audio.js` | Chiptune music and sound effects synthesised with Web Audio |
 | `js/level.js` | Level generator and solvability checker |
 | `js/game.js` | Game loop, patient loop and funnels, bays, screens, input |
+| `js/rush.js` | Emergency Rush corridor runner between shifts |
 
 Design notes and the blurb list are in `docs/`.
