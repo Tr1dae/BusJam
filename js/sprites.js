@@ -179,14 +179,34 @@ const DOCTOR = [
   '..kwwwwwWWk...',
   '..kkkkkkkkk...',
 ];
+const PORTER = [            // porter in blue scrubs, arms out pushing a bed
+  '....kkkkk.....',
+  '...khhhhhk....',
+  '..khhhhhhhk...',
+  '..kHhhhhssk...',
+  '..kHhhsskssk..',
+  '..kHssssssk...',
+  '...kSssssk....',
+  '....kkssskk...',
+  '...kTTTTTk....',
+  '..kTLLTTTTkkk.',
+  '.kTTLTTTTTsssk',
+  '.kTTLTTTTTkkk.',
+  '.kTTTTTTTk....',
+  '.kTTTTTTtk....',
+  '..kTTTTttk....',
+  '...kkkkkk.....',
+];
 const STAFF_LEGS = {
   nurse: LEGS.map(f => f.map(r => r.replace(/s/g, 't'))),
   doctor: LEGS.map(f => f.map(r => r.replace(/s/g, 'o').replace(/W/g, 'c'))),
+  porter: LEGS.map(f => f.map(r => r.replace(/s/g, 't').replace(/W/g, 'o'))),
 };
 const SCRUBS = { T:'#3fae7a', t:'#2e8a5f', L:'#7fd6a6' };
+const PORTER_SCRUBS = { T:'#4a7fd4', t:'#2f5a9e', L:'#8ab4ee' };
 
 // ---------- vehicles: shapes rasterised per angle (clean 45° staircases) ----------
-const AMB_W = 12, CART_W = 10;
+const AMB_W = 12, CART_W = 10, BED_LIFT = 5;
 function ambRegion(u, v, len) {
   const hl = len / 2, hw = AMB_W / 2, au = Math.abs(u), av = Math.abs(v), r = 2.2;
   if (au > hl || av > hw) return null;
@@ -286,6 +306,26 @@ const Sprites = (() => {
         return toCanvas(g, tint);
       });
     },
+    // a bed on the move: the top-down bed lifted onto a frame, with legs and castors underneath
+    bed3d(dept, len, dir, sirenSwap) {
+      return get(`b3|${dept.name}|${len}|${dir}|${sirenSwap ? 1 : 0}`, () => {
+        const top = Sprites.ambulance(dept, len, dir, sirenSwap), w = top.width, h = top.height, H = BED_LIFT;
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h + H + 2; const c = cv.getContext('2d');
+        const a = dir * Math.PI / 4, ca = Math.cos(a), sa = Math.sin(a), hl = len / 2 - 2.5, hw = AMB_W / 2 - 2;
+        // castors at ground level, with a leg up to the frame
+        for (const [u, v] of [[hl, hw], [hl, -hw], [-hl, hw], [-hl, -hw]]) {
+          const x = Math.round(w / 2 + u * ca - v * sa), y = Math.round(h / 2 + u * sa + v * ca) + H;
+          c.fillStyle = '#6c7484'; c.fillRect(x, y - H + 2, 1, H - 2); c.fillStyle = '#c8ced8'; c.fillRect(x, y - H + 2, 1, 1);
+          c.fillStyle = PAL.k; c.fillRect(x - 1, y - 1, 3, 3); c.fillStyle = '#9aa3b2'; c.fillRect(x, y, 1, 1);
+        }
+        // sides: blanket hanging over the edge, then the metal frame, under the top-down bed
+        const mask = top.getContext('2d').getImageData(0, 0, w, h).data;
+        for (let dy = 3; dy >= 1; dy--) { c.fillStyle = [null, dept.t, '#9aa3b2', '#4f5563'][dy];
+          for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (mask[(y * w + x) * 4 + 3]) c.fillRect(x, y + dy, 1, 1); }
+        c.drawImage(top, 0, 0);
+        return cv;
+      });
+    },
     cart(dir) { return get(`c|${dir}`, () => toCanvas(rasterize(cartRegion, 15, CART_W, dir * Math.PI / 4))); },
     shadow(kind, len, dir) {
       return get(`s|${kind}|${len}|${dir}`, () => {
@@ -298,8 +338,8 @@ const Sprites = (() => {
     },
     // kind 'nurse' | 'doctor'; hair is [main, shade]
     staff(kind, hair, frame, flip) {
-      return get(`st|${kind}|${hair}|${frame}|${flip ? 1 : 0}`, () => toCanvas(grid((kind === 'nurse' ? NURSE : DOCTOR).concat(STAFF_LEGS[kind][frame])),
-        { ...SCRUBS, h:hair[0], H:hair[1] }, flip));
+      return get(`st|${kind}|${hair}|${frame}|${flip ? 1 : 0}`, () => toCanvas(grid(({ nurse: NURSE, doctor: DOCTOR, porter: PORTER })[kind].concat(STAFF_LEGS[kind][frame])),
+        { ...(kind === 'porter' ? PORTER_SCRUBS : SCRUBS), h:hair[0], H:hair[1] }, flip));
     },
     icon(dept) { return get(`i|${dept.name}`, () => toCanvas(grid(ICONS[dept.name]), { w:dept.L, k:dept.D })); },
     DIRS,

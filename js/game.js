@@ -33,6 +33,8 @@ const BAY_Y = 148, BAY_W = 26, BAY_H = 38, LOT_TOP = 194, SLOTS = 6, OPEN = 3, U
 // each extra bay costs more than the last: 500, 1,000, 1,500
 const unlockCost = i => (i - OPEN + 1) * UNLOCK_COST;
 const bayX = i => 10 + i * 30, bayCx = i => bayX(i) + 13, bayCy = () => BAY_Y + 19;
+// beds park on a diagonal, nudged up-right so their porter fits in the bay behind them
+const PARK_DIR = 7, parkX = i => bayCx(i) + 3, parkY = () => bayCy() - 2;
 const LOT = { cx: 97, cy: Math.round((LOT_TOP + LH - 4) / 2), rx: 92, ry: Math.round((LH - 4 - LOT_TOP) / 2) - 2 };
 const DOOR = { x: LOOP.cx, y: LOOP.cy + LOOP.ry + 8 };
 // hospital interior decor; each piece reacts when tapped (tap = time of the last tap)
@@ -416,13 +418,13 @@ function update(dt) {
       else if (v.py < LOT_TOP + 2 || (!insideLot(v.px, v.py) && Math.hypot(v.px - v.x, v.py - v.y) > v.len / 2 + 6)) {
         v.state = 'route'; v.route = [];
         if (v.py > LOT_TOP + 8) v.route.push({ x: bayCx(v.bay), y: LOT_TOP + 8 });
-        v.route.push({ x: bayCx(v.bay), y: bayCy() });
+        v.route.push({ x: parkX(v.bay), y: parkY() });
       }
     } else if (v.state === 'route') {
       const wp = v.route[0], dx = wp.x - v.px, dy = wp.y - v.py, d = Math.hypot(dx, dy), step = 260 * dt;
       if (d > 0.5) v.dir = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
       if (d <= step) { v.px = wp.x; v.py = wp.y; v.route.shift();
-        if (!v.route.length) { v.state = 'parked'; v.dir = 6; const b = G.bays[v.bay]; b.state = 'parked'; b.seats = v.cap; b.filled = 0; b.t = 0; b.parkedAt = T; b.land = T; Sound.sfx.park(); puff(v.px, v.py + v.len / 2, 6); } }
+        if (!v.route.length) { v.state = 'parked'; v.dir = PARK_DIR; const b = G.bays[v.bay]; b.state = 'parked'; b.seats = v.cap; b.filled = 0; b.t = 0; b.parkedAt = T; b.land = T; Sound.sfx.park(); puff(v.px, v.py + v.len / 2, 6); } }
       else { v.px += dx / d * step; v.py += dy / d * step; }
     }
   }
@@ -468,7 +470,7 @@ function update(dt) {
   G.bays.forEach(bb => { bb.t += dt; });
   for (const L of G.leavers) { const was = L.t; L.t += dt;
     if (was < 0.35 && L.t >= 0.35) { Sound.sfx.siren(); addScore(L.v.cap * 5, bayCx(L.bay), BAY_Y + 6, true); }
-    if (was < 0.95 && L.t >= 0.95) puff(bayCx(L.bay) - 8, bayCy() + 32, 8);
+    if (was < 0.95 && L.t >= 0.95) puff(parkX(L.bay) - 16 - L.v.len / 2, parkY() + 28, 8);
     if (L.t > 1.95) L.v.state = 'gone'; }
   G.leavers = G.leavers.filter(L => L.t <= 1.95);
   if (G.over) return;
@@ -767,7 +769,23 @@ function drawSplash() {
 // ---------- play rendering ----------
 const flipIcon = [ '..k....', '.kk....', 'kkkkkk.', '.kk..k.', '..k..kk', '.kkkkkk', '.....kk', '.....k.' ];
 function badge(x, y, w, h, bg) { R(x - 1, y - 1, w + 2, h + 2, K); R(x, y, w, h, bg); }
+// a bed that has left the jam: raised on its frame with wheels, pushed by a porter at the head end
+const PORTER_HAIR = ['#3a2f3a', '#241c26'];
+function drawRaisedBed(v, px, py, opts) {
+  const x = Math.round(px), y = Math.round(py), a = v.dir * Math.PI / 4, c = Math.cos(a), s = Math.sin(a);
+  const img = Sprites.bed3d(v.revealed ? v.dept : TRIAGE, v.len, v.dir, opts.siren), h = img.height - BED_LIFT - 2;
+  if (c > 0.3) v.pflip = false; else if (c < -0.3) v.pflip = true;
+  const d = v.len / 2 + 4, qx = Math.round(x - c * d), qy = Math.round(y - s * d + 2);
+  const porter = () => { const pi = Sprites.staff('porter', PORTER_HAIR, opts.walking ? Math.floor(T * 10) % 4 : 0, !!v.pflip);
+    ellipse(qx, qy + 1, 4, 1, 'rgba(20,24,36,.25)'); ctx.drawImage(pi, qx - 7, qy - pi.height + 2); };
+  ellipse(x, y + 2, Math.round(v.len / 2 * Math.max(Math.abs(c), 0.6)), 3, 'rgba(20,24,36,.18)');
+  if (qy < y) porter();
+  ctx.drawImage(img, Math.round(x - img.width / 2), Math.round(y - h / 2 - BED_LIFT));
+  if (opts.siren !== undefined) { const col = opts.siren ? '#3d7bff' : '#ff4d4d'; ctx.globalAlpha = 0.16; ellipse(x, y - BED_LIFT, 15, 13, col); ctx.globalAlpha = 0.22; ellipse(x, y - BED_LIFT, 9, 8, col); ctx.globalAlpha = 1; }
+  if (qy >= y) porter();
+}
 function drawVehicle(v, px, py, opts = {}) {
+  if (opts.raised && v.kind === 'amb') return drawRaisedBed(v, px, py, opts);
   const sh = v.shake > 0 ? Math.round(Math.sin(v.shake * 60) * 1.5) : 0;
   const x = Math.round(px) + sh, y = Math.round(py);
   if (!opts.noShadow) blit(Sprites.shadow(v.kind, v.len, v.dir), x + 1, y + 2);
@@ -800,10 +818,10 @@ function drawPlay() {
       continue; }
     for (let k = 0; k < BAY_H; k++) { R(bx, BAY_Y + k, 1, 1, '#e6e9ee'); R(bx + BAY_W - 1, BAY_Y + k, 1, 1, '#e6e9ee'); }
     if (bb.state === 'parked') {
-      const jig = 0, land = T - (bb.land ?? -9) < 0.3 ? Math.round(Math.sin((T - bb.land) / 0.3 * Math.PI) * 2) : 0;
-      drawVehicle(bb.v, bayCx(i) + jig, bayCy() - land, { noShadow: true });
-      { const s = String(bb.v.cap - bb.filled), w = Font.smallWidth(s) + 6;
-        R(bayCx(i) - w / 2, BAY_Y + BAY_H - 8, w, 7, bb.v.dept.t); Font.small(ctx, s, bayCx(i) - w / 2 + 3, BAY_Y + BAY_H - 7, '#fff'); }
+      const land = T - (bb.land ?? -9) < 0.3 ? Math.round(Math.sin((T - bb.land) / 0.3 * Math.PI) * 2) : 0;
+      drawVehicle(bb.v, parkX(i), parkY() - land, { raised: true });
+      { const s = String(bb.v.cap - bb.filled), w = Font.smallWidth(s) + 6;   // seats left, tucked in the free top-left corner
+        badge(bx + 2, BAY_Y + 2, w, 7, bb.v.dept.t); Font.small(ctx, s, bx + 5, BAY_Y + 3, '#fff'); }
     }
   }
   // lot
@@ -829,15 +847,16 @@ function drawPlay() {
     walkers.push({ x, y, dept: fl.dept, left: false, f: Math.floor(T * 10) % 4 }); }
   drawPeople(walkers);
   // moving vehicles on top
-  for (const v of G.vehicles) if (v.state === 'exit' || v.state === 'route') drawVehicle(v, v.px, v.py, v.away ? { siren: Math.floor(T * 10) % 2 === 0 } : {});
-  for (const L of G.leavers) { const v = L.v, ax = bayCx(L.bay), ay = bayCy();
-    if (L.t < 0.35) { v.dir = 6; drawVehicle(v, ax + Math.round(Math.sin(L.t * 70)), ay, { noShadow: true }); continue; }
+  for (const v of G.vehicles) if (v.state === 'exit' || v.state === 'route') drawVehicle(v, v.px, v.py, v.away ? { siren: Math.floor(T * 10) % 2 === 0 } : { raised: true, walking: true });
+  for (const L of G.leavers) { const v = L.v, ax = parkX(L.bay), ay = parkY();
+    if (L.t < 0.35) { v.dir = PARK_DIR; drawVehicle(v, ax + Math.round(Math.sin(L.t * 70)), ay, { raised: true }); continue; }
     const t = L.t - 0.35, flash = Math.floor(t * 10) % 2 === 0;
-    let dir = 6, px = ax, py = ay;
-    if (t < 0.45) py = ay + ease(t / 0.45) * 30;
-    else if (t < 0.6) { dir = 7; py = ay + 30; px = ax + 2; }
-    else { dir = 0; const u = t - 0.6; py = ay + 32; px = ax + 4 + u * u * 260; }
-    v.dir = dir; drawVehicle(v, px, py, { siren: flash, noShadow: true });
+    // back out down-left along the diagonal, swing round, then race off to the right
+    let dir = PARK_DIR, px = ax, py = ay;
+    if (t < 0.45) { const e = ease(t / 0.45) * 26; px = ax - e * 0.6; py = ay + e; }
+    else if (t < 0.6) { dir = 0; px = ax - 16; py = ay + 26; }
+    else { dir = 0; const u = t - 0.6; py = ay + 27; px = ax - 16 + u * u * 260; }
+    v.dir = dir; drawVehicle(v, px, py, { siren: flash, raised: true, walking: true });
     if (dir === 0 && t > 0.7) for (let k = 1; k < 4; k++) R(Math.round(px - v.len / 2 - k * 5 - (t * 40) % 4), Math.round(py) - 3 + k * 2, 3, 1, 'rgba(255,255,255,.7)'); }
   // FULL! stamp drops onto a bay as it fills
   G.leavers.forEach(L => { const age = T - L.stamp, i = L.bay; if (age > 1.1) return;
