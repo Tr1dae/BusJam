@@ -289,9 +289,9 @@ const Rush = (() => {
     drawPlayer();
     // pools of light under each ceiling panel slide past as you run
     { const h = new Date().getHours(), night = h >= 19 || h < 7;
-      Light.begin(night ? '#a3a9c8' : '#c8cddd', 0.35);
-      for (const [x, y, sc] of lamps) if (sc > 3) Light.add(x + ox, y, Math.min(140, sc * 1.1), Math.min(70, sc * 0.4), '#fff1d6', 0.5, 0, 1.1);
-      for (const [x, y, sc] of lamps) if (sc > 3) Light.add(x + ox, y - sc * 2.5, Math.min(120, sc * 0.9), Math.min(40, sc * 0.3), '#fffbe0', 0.4, 0.08, 1.1);
+      Light.begin(night ? '#cfcbd8' : '#ece6da', 0);
+      for (const [x, y, sc] of lamps) if (sc > 3) Light.add(x + ox, y, Math.min(140, sc * 1.1), Math.min(70, sc * 0.4), '#fff1d6', 0.3, 0, 1.1);
+      for (const [x, y, sc] of lamps) if (sc > 3) Light.add(x + ox, y - sc * 2.5, Math.min(120, sc * 0.9), Math.min(40, sc * 0.3), '#fffbe0', 0.15, 0.04, 1.1);
       Light.add(LW / 2, LH - 30, 50, 34, '#fff1d6', 0.3);
       Light.end(); }
     // speed lines while boosted

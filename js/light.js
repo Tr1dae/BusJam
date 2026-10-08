@@ -35,6 +35,7 @@ const Light = (() => {
     }
     g.putImageData(img, 0, 0); vignettes.set(key, c); return c;
   }
+  const LIFT = 0.62, GLOW = 0.1;
   const map = document.createElement('canvas'); let mg = null, blooms = [], on = true;
   try { on = localStorage.getItem('aj.lights') !== 'off'; } catch (e) {}
   return {
@@ -44,6 +45,8 @@ const Light = (() => {
     // start a light map: ambient is what unlit areas are multiplied by
     begin(ambient, vig = 0.35, vigCol = '#1b2140') {
       if (!on) return;
+      // keep the world bright: the ambient only takes the edge off, and the vignette stays faint
+      { const a = hex(ambient), m = v => Math.round(v + (255 - v) * LIFT); ambient = 'rgb(' + a.map(m).join(',') + ')'; vig *= 0.45; }
       if (map.width !== LW || map.height !== LH) { map.width = LW; map.height = LH; }
       mg = map.getContext('2d'); mg.globalAlpha = 1; mg.globalCompositeOperation = 'source-over';
       mg.fillStyle = ambient; mg.fillRect(0, 0, LW, LH);
@@ -54,7 +57,8 @@ const Light = (() => {
     add(x, y, rx, ry, col, a = 1, bloom = 0, soft) {
       if (!on || !mg || a <= 0) return;
       const s = pool(rx, ry, col, soft); mg.globalAlpha = Math.min(1, a); mg.drawImage(s, Math.round(x - s.width / 2), Math.round(y - s.height / 2));
-      if (bloom > 0) blooms.push([x, y, rx, ry, col, bloom, soft]);
+      // pools also add a little light of their own, so lamps read as warm highlights rather than holes in the dark
+      blooms.push([x, y, rx, ry, col, bloom + a * GLOW, soft]);
     },
     end() {
       if (!on || !mg) return;
