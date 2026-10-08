@@ -66,6 +66,15 @@ const Sound = (() => {
     quack() { tone({ wave:'pulse12', f:620, f2:430, dur:0.1, vol:0.2 }); tone({ wave:'pulse12', f:600, f2:400, at:0.13, dur:0.12, vol:0.2 }); },
     blip(f) { tone({ wave:'pulse25', f, dur:0.035, vol:0.07 }); },
     boing() { tone({ wave:'sine', f:220, f2:660, dur:0.16, vol:0.22 }); },
+    blub()  { [0, 0.07, 0.15].forEach((at, i) => tone({ wave:'sine', f:380 + i * 140, f2:900 + i * 200, at, dur:0.06, vol:0.15 })); },
+    slip()  { tone({ wave:'pulse25', f:900, f2:250, dur:0.25, vol:0.12 }); noise({ at:0.27, dur:0.08, vol:0.18, hp:400 }); },
+    squeak(){ tone({ wave:'triangle', f:1400, f2:1700, dur:0.08, vol:0.12 }); tone({ wave:'triangle', f:1500, f2:1300, at:0.5, dur:0.08, vol:0.1 }); },
+    woof()  { tone({ wave:'pulse25', f:330, f2:220, dur:0.09, vol:0.2 }); tone({ wave:'pulse25', f:360, f2:230, at:0.14, dur:0.1, vol:0.2 }); },
+    startle(){ tone({ wave:'pulse25', f:400, f2:1100, dur:0.1, vol:0.15 }); },
+    rustle(){ noise({ dur:0.18, vol:0.12, hp:3000 }); noise({ at:0.12, dur:0.12, vol:0.08, hp:4000 }); },
+    clunk() { tone({ wave:'square', f:140, f2:90, at:0.4, dur:0.08, vol:0.2 }); noise({ at:0.4, dur:0.05, vol:0.2, hp:600 }); },
+    brew()  { noise({ dur:0.5, vol:0.08, hp:1800 }); tone({ wave:'sine', f:500, f2:700, at:0.5, dur:0.12, vol:0.1 }); },
+    whirr() { tone({ wave:'pulse12', f:300, f2:1500, dur:0.5, vol:0.1 }); tone({ wave:'sine', f:1568, at:0.55, dur:0.12, vol:0.12 }); },
     start() { [64, 67, 72].forEach((m, i) => tone({ wave:'pulse25', f:mtof(m), at:i * 0.07, dur:0.1, vol:0.16 })); },
   };
 

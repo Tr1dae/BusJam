@@ -2,15 +2,14 @@
 
 An ad-free, pixel-art traffic puzzle for phones, set at St. Becca's General.
 
-Ambulances are jammed in the car park. Tap one to drive it out the way its arrow points; if the road is clear it parks in a bay. Patients walk the loop four abreast, and anyone whose department's ambulance is parked steps out at the entrance and boards. Ambulances carry 16, 24 or 40 patients, and patients arrive in solid department blocks. Each ambulance fills completely before the next one of its department starts boarding. Full ambulances reverse out and race off with the sirens going. Clear the lot to finish the shift.
+Coloured hospital beds are jammed in the corridor. Tap one to roll it out the way its arrow points; if the way is clear it parks in a transfer bay. Patients walk the waiting-area loop four abreast, and anyone whose department's bed is parked steps out and hops on. Beds take 16, 24 or 40 patients, and patients arrive in solid department blocks. Each bed fills completely before the next one of its department starts boarding. Full beds reverse out and race off with their lights flashing. Clear the jam to finish the shift. (The splash screen is still the outside of the hospital, with ambulances.)
 
 - **Departments:** Cardiac (heart pillow), Neuro (head wrap, seeing stars), Ortho (cast and sling), Peds (teddy), Maternity (very pregnant), Burns (on fire).
-- **Quirks:** triage-pending grey ambulances (shift 3+), flip-floppers that turn around every move (shift 5+), and the Code Blue crash cart with a move counter (shift 7+).
-- **The park:** the walkway sits in a little park with a duck pond (tap it). Tap the centre sign for the patient legend, which also pauses the shift.
-- **Cameos:** once a shift one of Becca's friends (Becca, Sarah, Jess, Carly, Katrina, Jann, Angela) walks on in green scrubs with a comment; now and then a doctor pops up with a daft request. Tap the bubble to skip.
-- **Difficulty:** from shift 3 fewer rows of patients fit on the loop at once (the rest wait in the side queues), and from shift 4 patients increasingly turn up for ambulances still buried in the jam. Both are set in `levelConfig` (`window`, `scatter`).
-- **Bays and score:** 4 bays are open and 2 are locked. Opening one costs 500 points; any left locked at the end of a shift are worth +500 each. Patients score 10 each, departures 5 per seat, a cleared shift 1,000, and the career total is saved.
-- **Levels** are generated from the shift number and always solvable: vehicles are packed, then "peeled" off in an order that is guaranteed to work, and a checker rejects any layout with head-on blocks or cycles.
+- **Quirks:** triage-pending grey beds (shift 3+), flip-floppers that turn around every move (shift 5+), and the Code Blue crash cart with a move counter (shift 7+).
+- **The ward:** the loop runs round a nurses' station; tap the station sign for the patient legend, which also pauses the shift. Fish tank, wet floor sign, wheelchair, therapy corgi, sleeping visitor, pot plant, vending machine, coffee machine and wall clock (real time) all react to taps.
+- **Cameos:** once a shift one of Becca's friends (Becca, Sarah, Jess, Carly, Katrina, Jann, Angela, Sophie) walks on in green scrubs with a comment; now and then a doctor pops up with a daft request. Tap the bubble to skip.
+- **Difficulty:** from shift 3 fewer rows of patients fit on the loop at once (the rest wait in the side queues), and from shift 4 patients increasingly turn up for beds still buried in the jam. Both are set in `levelConfig` (`window`, `scatter`).
+- **Bays and score:** 3 bays are open and 3 are locked. Opening them costs 500, then 1,000, then 1,500 points; any left locked at the end of a shift are worth +500 each. Patients score 10 each, departures 5 per seat, a cleared shift 1,000, and the career total is saved.
 
 ## Running it
 

@@ -207,6 +207,23 @@ function ambRegion(u, v, len) {
   if (v > hw - 1.8) return 't';
   return 'T';
 }
+// hospital bed seen from above: headboard + pillow at the back, blanket in the department colour,
+// footboard with a flashing beacon at the front, castors on the corners
+function bedRegion(u, v, len) {
+  const hl = len / 2, hw = AMB_W / 2, au = Math.abs(u), av = Math.abs(v);
+  if (au > hl || av > hw) return null;
+  if (au > hl - 0.8 && av > hw - 0.8) return null;
+  if (au > hl - 2.2 && av > hw - 2.2) return 'o';
+  if (u >= hl - 2.2) return av < 2.6 ? (v < 0 ? 'r' : 'B') : 'g';
+  if (u < -hl + 2) return 'G';
+  if (av > hw - 1.2) return 'z';
+  if (u < -hl + 5.4) return av > hw - 2.6 || u < -hl + 2.8 ? 'W' : 'w';
+  if (u < -hl + 6.8) return 'L';
+  const roofA = -hl + 6.8, roofB = hl - 2.4, tip = roofB - 1, head = Math.min(4.2, (roofB - roofA) * 0.5);
+  if (u > tip - head && av < (tip - u) * 0.95 + 0.2) return 'w';
+  if (u > roofA + 1.2 && u <= tip - head + 0.6 && av < 1.15) return 'w';
+  return v > hw - 2.8 ? 't' : 'T';
+}
 function cartRegion(u, v, len) {
   const hl = len / 2, hw = CART_W / 2, au = Math.abs(u), av = Math.abs(v);
   if (au > hl || av > hw) return null;
@@ -264,7 +281,7 @@ const Sprites = (() => {
     // dept: DEPTS entry or TRIAGE; dir 0..7 (0 = facing right, clockwise)
     ambulance(dept, len, dir, sirenSwap) {
       return get(`a|${dept.name}|${len}|${dir}|${sirenSwap ? 1 : 0}`, () => {
-        const g = get(`ag|${len}|${dir}`, () => rasterize(ambRegion, len, AMB_W, dir * Math.PI / 4));
+        const g = get(`ag|${len}|${dir}`, () => rasterize(bedRegion, len, AMB_W, dir * Math.PI / 4));
         const tint = bodyTint(dept); if (sirenSwap) { tint.r = PAL.B; tint.B = PAL.r; }
         return toCanvas(g, tint);
       });
@@ -272,7 +289,7 @@ const Sprites = (() => {
     cart(dir) { return get(`c|${dir}`, () => toCanvas(rasterize(cartRegion, 15, CART_W, dir * Math.PI / 4))); },
     shadow(kind, len, dir) {
       return get(`s|${kind}|${len}|${dir}`, () => {
-        const g = kind === 'cart' ? rasterize(cartRegion, 15, CART_W, dir * Math.PI / 4) : rasterize(ambRegion, len, AMB_W, dir * Math.PI / 4);
+        const g = kind === 'cart' ? rasterize(cartRegion, 15, CART_W, dir * Math.PI / 4) : rasterize(bedRegion, len, AMB_W, dir * Math.PI / 4);
         return toCanvas(g.map(r => r.map(k => k === '.' ? '.' : 'o')), { o:'rgba(30,35,45,0.35)' });
       });
     },

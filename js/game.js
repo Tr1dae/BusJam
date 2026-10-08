@@ -29,18 +29,28 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 // ---------- layout ----------
 const LOOP = { cx: 97, cy: 80, rx: 56, ry: 38 };
 const LANES = [-10.5, -3.5, 3.5, 10.5], ROW = 9, LOOP_SPEED = 30;
-const BAY_Y = 148, BAY_W = 26, BAY_H = 38, LOT_TOP = 194, SLOTS = 6, OPEN = 4, UNLOCK_COST = 500;
+const BAY_Y = 148, BAY_W = 26, BAY_H = 38, LOT_TOP = 194, SLOTS = 6, OPEN = 3, UNLOCK_COST = 500;
+// each extra bay costs more than the last: 500, 1,000, 1,500
+const unlockCost = i => (i - OPEN + 1) * UNLOCK_COST;
 const bayX = i => 10 + i * 30, bayCx = i => bayX(i) + 13, bayCy = () => BAY_Y + 19;
 const LOT = { cx: 97, cy: Math.round((LOT_TOP + LH - 4) / 2), rx: 92, ry: Math.round((LH - 4 - LOT_TOP) / 2) - 2 };
 const DOOR = { x: LOOP.cx, y: LOOP.cy + LOOP.ry + 8 };
-// park decor around the walkway; everything sits in the gaps the paths leave free
-const PARK = {
-  pond: { x: 22, y: 126, rx: 18, ry: 8 },
-  trees: [[8, 107, 0.8, 0], [184, 114, 1, 1.7], [44, 31, 0.65, 3.1], [150, 31, 0.65, 4.4]],
-  bench: { x: 146, y: 134 },
-};
+// hospital interior decor; each piece reacts when tapped (tap = time of the last tap)
+const DECOR = [
+  { id: 'tank', x: 4, y: 110, w: 36, h: 26 },
+  { id: 'wet', x: 42, y: 122, w: 11, h: 17 },
+  { id: 'wheelchair', x: 55, y: 125, w: 18, h: 17 },
+  { id: 'dog', x: 108, y: 127, w: 26, h: 16 },
+  { id: 'sleeper', x: 139, y: 116, w: 30, h: 26 },
+  { id: 'plant', x: 175, y: 94, w: 20, h: 44 },
+  { id: 'vending', x: 146, y: 12, w: 15, h: 25 },
+  { id: 'coffee', x: 33, y: 14, w: 17, h: 24 },
+  { id: 'clock', x: 90, y: 13, w: 11, h: 11 },
+].map(d => ({ ...d, tap: -99 }));
+const DECOR_SFX = { tank: () => Sound.sfx.blub(), wet: () => Sound.sfx.slip(), wheelchair: () => Sound.sfx.squeak(), dog: () => Sound.sfx.woof(),
+  sleeper: () => Sound.sfx.startle(), plant: () => Sound.sfx.rustle(), vending: () => Sound.sfx.clunk(), coffee: () => Sound.sfx.brew(), clock: () => Sound.sfx.whirr() };
+const decorAt = (x, y) => DECOR.find(d => x >= d.x && x <= d.x + d.w && y >= d.y && y <= d.y + d.h);
 const SIGN = (() => { const w = Font.smallWidth(SIGN_SHORT) + 14; return { x: Math.round(LOOP.cx - w / 2), y: LOOP.cy - 12, w }; })();
-const inPond = (x, y) => ((x - PARK.pond.x) / (PARK.pond.rx + 2)) ** 2 + ((y - PARK.pond.y) / (PARK.pond.ry + 2)) ** 2 <= 1;
 
 function makePath(pts, closed) { const P = pts.slice(); if (closed) P.push(pts[0]);
   const cum = [0]; for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
@@ -82,19 +92,19 @@ const BLURBS = [
   'Bed 6 says they "know their rights." Bed 6 would like a warm blanket.',
 ];
 const WIN_LINES = ["They'll be back.", 'Beds are clean. For eleven minutes.', 'Handover done. Not your problem anymore.', "Everyone's where they belong. Suspicious."];
-const LOSE_LINES = ['Somebody page the charge nurse.', "Time for a coffee you won't finish.", 'Code Brown in the parking lot.'];
+const LOSE_LINES = ['Somebody page the charge nurse.', "Time for a coffee you won't finish.", 'Code Brown in the hallway.'];
 const INTROS = {
-  1: "Tap an ambulance to drive it out. Patients board the ambulance for their department. Full ones leave. Clear the lot! Locked bays open for 500 points each. Tap the sign to see who's who.",
-  3: 'New: triage pending. Grey ambulances hide their department until the road ahead is clear.',
-  5: 'New: flip-floppers. Ambulances with the yellow arrows turn around every time you send another one off.',
+  1: "Tap a bed to roll it out. Patients hop on the bed for their department. Full beds head off. Clear the jam! Locked bays cost 500, then 1,000, then 1,500. Tap the nurses' station to see who's who.",
+  3: 'New: triage pending. Grey beds hide their department until the way ahead is clear.',
+  5: 'New: flip-floppers. Beds with the yellow arrows turn around every time you send another one off.',
   7: 'New: code blue! The crash cart has to leave before its counter hits zero. Every move counts.',
 };
 
 // ---------- staff cameos ----------
 // one of Becca's friends drops by once a shift; now and then a doctor pops up too
-const NURSES = ['Becca', 'Sarah', 'Jess', 'Carly', 'Katrina', 'Jann', 'Angela'];
+const NURSES = ['Becca', 'Sarah', 'Jess', 'Carly', 'Katrina', 'Jann', 'Angela', 'Sophie'];
 const HAIR = { Becca: ['#4f3322', '#38231a'], Sarah: ['#f0c75e', '#c99a32'], Jess: ['#7a4a2a', '#5c3620'], Carly: ['#b5532e', '#843a1f'],
-  Katrina: ['#3a2f3a', '#241c26'], Jann: ['#a8743f', '#7d5329'], Angela: ['#d98a4e', '#a8643a'] };
+  Katrina: ['#3a2f3a', '#241c26'], Jann: ['#a8743f', '#7d5329'], Angela: ['#d98a4e', '#a8643a'], Sophie: ['#e8d38a', '#bfa45a'] };
 const NURSE_LINES = [
   "Bed 4 wants a sandwich. Bed 4 is NPO. Bed 4 is furious.",
   "Someone googled their symptoms. They're dying of everything.",
@@ -193,7 +203,7 @@ const DOCTOR_LINES = [
   "It says 'see nursing notes'. I don't read those.",
   "Can someone find a med student? I need my bag carried.",
   "Have we tried turning the patient off and on again?",
-  "Anyone know where I parked? The ambulance bay is fine, right?",
+  "Anyone know where I parked? The bed bay is fine, right?",
   "Who ordered this? Oh, me. Cancel it. Actually, don't.",
   "I'll write that down later. I won't.",
   "Can you hold the patient's hand? Great. Forever, please.",
@@ -342,8 +352,8 @@ const fmt = n => (n < 0 ? '-' : '') + String(Math.abs(Math.round(n))).replace(/\
 function addScore(pts, x, y, big) { G.score += pts; if (big) G.floats.push({ text: (pts > 0 ? '+' : '') + fmt(pts), x, y, t: 0, col: pts < 0 ? '#ff4d4d' : '#ffe066' }); }
 function unlockBay() {
   if (G.open >= SLOTS) return;
-  G.open++; addScore(-UNLOCK_COST, bayCx(G.open - 1), BAY_Y + 10, true);
-  flash('BAY OPENED  -' + UNLOCK_COST); Sound.sfx.bonus(); sparkle(bayCx(G.open - 1), bayCy(), 24, ['#4ade80', '#ffe066', '#ffffff']);
+  const cost = unlockCost(G.open); G.open++; addScore(-cost, bayCx(G.open - 1), BAY_Y + 10, true);
+  flash('BAY OPENED  -' + fmt(cost)); Sound.sfx.bonus(); sparkle(bayCx(G.open - 1), bayCy(), 24, ['#4ade80', '#ffe066', '#ffffff']);
 }
 function buzz(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
 function flash(msg) { toast = { msg, t: 1.6 }; }
@@ -351,13 +361,14 @@ function flash(msg) { toast = { msg, t: 1.6 }; }
 let fx = [], confetti = [], taps = [], shakeT = 0, shakeAmp = 0;
 function shakeScreen(t, amp) { shakeT = Math.max(shakeT, t); shakeAmp = amp; }
 function puff(x, y, n, col = '#f1f3f6') { for (let i = 0; i < n; i++) fx.push({ kind: 'dust', x: x + (Math.random() - 0.5) * 6, y: y + (Math.random() - 0.5) * 3, vx: (Math.random() - 0.5) * 16, vy: -Math.random() * 8, t: 0, life: 0.35 + Math.random() * 0.25, col }); }
+function leaf(x, y) { fx.push({ kind: 'leaf', x, y, vx: 0, vy: 9, t: 0, life: 2.6 }); }
 function sparkle(x, y, n, col) { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, sp = 20 + Math.random() * 30;
   fx.push({ kind: 'spark', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 15, t: 0, life: 0.5 + Math.random() * 0.3, col: Array.isArray(col) ? pick(col) : col }); } }
 const CONFETTI = ['#ff4d4d', '#ffe066', '#4ade80', '#3a86ff', '#ff7eb6', '#c9a2f5', '#ffffff'];
 function dropConfetti(n, top) { for (let i = 0; i < n; i++) confetti.push({ x: Math.random() * LW, y: top ? -Math.random() * 60 : -4, vy: 26 + Math.random() * 26, ph: Math.random() * 6, col: pick(CONFETTI), t: 0 }); }
 function updateFx(dt) {
   if (shakeT > 0) shakeT = Math.max(0, shakeT - dt);
-  for (const f of fx) { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; if (f.kind === 'spark') f.vy += 60 * dt; else { f.vx *= 0.9; f.vy *= 0.9; } }
+  for (const f of fx) { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; if (f.kind === 'spark') f.vy += 60 * dt; else if (f.kind === 'leaf') f.vx = Math.sin(f.t * 5) * 10; else { f.vx *= 0.9; f.vy *= 0.9; } }
   fx = fx.filter(f => f.t < f.life);
   for (const c of confetti) { c.t += dt; c.y += c.vy * dt; c.x += Math.sin(c.t * 4 + c.ph) * 14 * dt; }
   confetti = confetti.filter(c => c.y < LH + 4);
@@ -366,7 +377,8 @@ function updateFx(dt) {
 }
 function drawFx() {
   for (const f of fx) { const u = f.t / f.life;
-    if (f.kind === 'dust') { ctx.globalAlpha = 0.75 * (1 - u); disc(Math.round(f.x), Math.round(f.y), Math.round(1 + u * 2.5), f.col); }
+    if (f.kind === 'leaf') { ctx.globalAlpha = Math.min(1, (f.life - f.t) * 3); R(Math.round(f.x), Math.round(f.y), 2, 1, '#4fae55'); R(Math.round(f.x) + (Math.sin(f.t * 5) > 0 ? 1 : 0), Math.round(f.y) + 1, 1, 1, '#2f7a3a'); }
+    else if (f.kind === 'dust') { ctx.globalAlpha = 0.75 * (1 - u); disc(Math.round(f.x), Math.round(f.y), Math.round(1 + u * 2.5), f.col); }
     else { ctx.globalAlpha = 1 - u * u; R(Math.round(f.x), Math.round(f.y), 1, 1, f.col); if (u < 0.4) { R(Math.round(f.x) - 1, Math.round(f.y), 3, 1, f.col); R(Math.round(f.x), Math.round(f.y) - 1, 1, 3, f.col); } } }
   ctx.globalAlpha = 1;
   for (const r of taps) { const rad = 2 + r.t * 30; ctx.globalAlpha = 1 - r.t / 0.3;
@@ -463,7 +475,8 @@ function update(dt) {
   if (allFull) {
     const wanted = new Set(G.bays.filter(b => b.state === 'parked' && b.seats > 0).map(b => b.v.dept));
     const match = G.rows.some(r => !rowEmpty(r) && wanted.has(r.dept));
-    const canRefill = queued && G.rows.some(rowEmpty);
+    // the side queues can only top the loop up while it has room under this shift's row limit
+    const canRefill = queued && G.rows.some(rowEmpty) && (!G.cfg.window || G.rows.filter(r => !rowEmpty(r)).length < G.cfg.window);
     if (!match && !canRefill) lose('jam');
   }
 }
@@ -473,110 +486,127 @@ function makeLayer() { const c = document.createElement('canvas'); c.width = LW;
 const playBg = makeLayer();
 function buildPlayBg() {
   const b = playBg.getContext('2d'); srand = 11;
-  // mown grass with diagonal stripes, tufts and the odd daisy
-  R(0, 0, LW, LOT_TOP, '#8fca76', b);
-  for (let y = 0; y < LOT_TOP; y++) for (let x0 = -LOT_TOP; x0 < LW; x0 += 24) R(x0 + Math.floor(y / 2), y, 12, 1, '#97d07e', b);
-  for (let i = 0; i < 260; i++) R(Math.floor(prand() * LW), 13 + Math.floor(prand() * (LOT_TOP - 13)), 1, 2, prand() < 0.6 ? '#7dba64' : '#a8dc90', b);
-  for (let i = 0; i < 40; i++) R(Math.floor(prand() * LW), 13 + Math.floor(prand() * (BAY_Y - 20)), 1, 1, ['#ffffff', '#ffe066', '#ff9fb0'][i % 3], b);
-  // stone paths
+  // mint lino floor
+  for (let ty = 0; ty < LOT_TOP; ty += 8) for (let tx = 0; tx < LW; tx += 8) R(tx, ty, 8, 8, ((tx + ty) / 8) % 2 ? '#dcefe6' : '#d1e7dc', b);
+  for (let i = 0; i < 300; i++) R(Math.floor(prand() * LW), 24 + Math.floor(prand() * (LOT_TOP - 24)), 1, 1, prand() < 0.5 ? '#c4dfd1' : '#e9f6f0', b);
+  // back wall with a handrail, posters and skirting
+  R(0, 13, LW, 10, '#e4eef2', b); R(0, 18, LW, 1, '#b7c9cf', b); R(0, 17, LW, 1, '#f5fafb', b); R(0, 22, LW, 2, '#9fb3bb', b);
+  const poster = (x, txt, bg, fg) => { const w = Font.smallWidth(txt) + 6; R(x - 1, 13, w + 2, 9, K, b); R(x, 14, w, 7, bg, b); Font.small(b, txt, x + 3, 15, fg); };
+  poster(53, 'HYDRATE', '#fff3c4', '#7a4b00'); poster(104, 'NO Q WORD', '#ffd6dc', '#b52a3a');
+  // walkway: a cream runner the patients follow
   const band = (path, w, col) => { b.strokeStyle = col; b.lineWidth = w; b.lineJoin = 'round'; b.lineCap = 'round'; b.beginPath();
     path.P.forEach((p, i) => i ? b.lineTo(p[0], p[1]) : b.moveTo(p[0], p[1])); if (path.closed) b.closePath(); b.stroke(); };
-  const PATH = '#e8dcc0', EDGE = '#b9a37e';
+  const PATH = '#f3ecdc', EDGE = '#c9b896';
   for (const p of FUNNEL_PATHS) band(p, 34, EDGE); band(loopPath, 34, EDGE);
   R(LOOP.cx - 9, LOOP.cy + LOOP.ry, 18, BAY_Y - LOOP.cy - LOOP.ry - 2, EDGE, b);
   for (const p of FUNNEL_PATHS) band(p, 30, PATH); band(loopPath, 30, PATH);
   R(LOOP.cx - 7, LOOP.cy + LOOP.ry, 14, BAY_Y - LOOP.cy - LOOP.ry - 2, PATH, b);
-  { // speckle the paving (only where the path is)
+  { // runner gets a soft tile pattern
     const img = b.getImageData(0, 0, LW, LOT_TOP), d = img.data;
-    for (let i = 0; i < 900; i++) { const x = Math.floor(prand() * LW), y = 13 + Math.floor(prand() * (LOT_TOP - 13)), k = (y * LW + x) * 4;
-      if (d[k] === 0xe8 && d[k + 1] === 0xdc && d[k + 2] === 0xc0) R(x, y, prand() < 0.5 ? 2 : 1, 1, prand() < 0.7 ? '#dccdab' : '#f3ead6', b); }
+    for (let y = 0; y < LOT_TOP; y++) for (let x = 0; x < LW; x++) { const k = (y * LW + x) * 4;
+      if (d[k] === 0xf3 && d[k + 1] === 0xec && d[k + 2] === 0xdc) { if (((x >> 3) + (y >> 3)) % 2) { d[k] = 0xec; d[k + 1] = 0xe3; d[k + 2] = 0xcf; } if (x % 8 === 0 || y % 8 === 0) { d[k] -= 10; d[k + 1] -= 10; d[k + 2] -= 10; } } }
+    b.putImageData(img, 0, 0);
   }
-  // lawn island + flower bed + signpost
-  ellipse(LOOP.cx, LOOP.cy, LOOP.rx - 17, LOOP.ry - 17, '#9fd18b', b);
-  for (let i = 0; i < 30; i++) { const a = prand() * 6.28, rr = Math.sqrt(prand()); R(Math.round(LOOP.cx + Math.cos(a) * (LOOP.rx - 20) * rr), Math.round(LOOP.cy + Math.sin(a) * (LOOP.ry - 20) * rr), 1, 2, '#7fb86c', b); }
-  const bush = (x, y, r) => { ellipse(x, y + r - 1, r + 1, 2, 'rgba(40,80,40,.3)', b); disc(x, y, r, '#3f8f43', b); disc(x - 1, y - 1, r - 2, '#5bb35a', b);
-    R(x + 1, y - 2, 1, 1, '#ff9fb0', b); R(x - 2, y + 1, 1, 1, '#ffe066', b); };
-  bush(68, 86, 4); bush(126, 86, 4);
-  ellipse(LOOP.cx, 91, 13, 3, '#8a5a3a', b); ellipse(LOOP.cx, 90, 12, 2, '#9b6a45', b);
-  for (let i = 0; i < 16; i++) R(LOOP.cx - 11 + Math.floor(prand() * 22), 89 + Math.floor(prand() * 3), 1, 1, ['#ff4d4d', '#ffe066', '#ff9fb0', '#c9a2f5'][i % 4], b);
-  const w = Font.smallWidth(SIGN_SHORT) + 14, sx = Math.round(LOOP.cx - w / 2), sy = LOOP.cy - 12;
-  R(LOOP.cx - 1, sy + 10, 3, 13, '#6e4321', b); R(LOOP.cx + 1, sy + 10, 1, 13, '#4a2f22', b);
+  // nurses' station island
+  ellipse(LOOP.cx, LOOP.cy, LOOP.rx - 17, LOOP.ry - 17, '#e9e1f3', b);
+  for (let i = 0; i < 36; i++) { const a = prand() * 6.28, rr = Math.sqrt(prand()); R(Math.round(LOOP.cx + Math.cos(a) * (LOOP.rx - 20) * rr), Math.round(LOOP.cy + Math.sin(a) * (LOOP.ry - 20) * rr), 1, 1, '#d9cdea', b); }
+  const { x: sx, y: sy, w } = SIGN;
+  R(LOOP.cx - 1, sy + 10, 3, 13, '#7d8594', b); R(LOOP.cx + 1, sy + 10, 1, 13, '#4f5563', b);
   R(sx - 1, sy - 1, w + 2, 13, K, b); R(sx, sy, w, 11, '#1f4e9c', b); R(sx, sy, w, 1, '#2f66c4', b);
   R(sx + 2, sy + 2, 7, 7, '#fff', b); R(sx + 5, sy + 3, 1, 5, '#e8424f', b); R(sx + 3, sy + 5, 5, 1, '#e8424f', b);
   Font.small(b, SIGN_SHORT, sx + 11, sy + 3, '#fff');
-  // hedge along the top wall
-  R(54, 15, 86, 6, '#3f8f43', b); for (let x = 56; x < 140; x += 7) { disc(x, 15, 3, '#3f8f43', b); disc(x - 1, 14, 1, '#5bb35a', b); }
-  for (let x = 58; x < 138; x += 11) R(x, 17, 1, 1, '#ff9fb0', b);
-  R(54, 21, 86, 1, '#2f6e34', b);
-  // tree trunks and shadows (the canopies sway, so they're drawn live)
-  for (const [tx, ty, s] of PARK.trees) { ellipse(tx + 1, ty + Math.round(10 * s) - 1, Math.round(9 * s), 2, 'rgba(40,80,40,.35)', b);
-    R(tx - 2, ty - 2, 4, Math.round(12 * s), '#7a4a2a', b); R(tx, ty - 2, 2, Math.round(12 * s), '#5c3620', b); }
-  // duck pond
-  const P = PARK.pond;
-  ellipse(P.x, P.y + 1, P.rx + 2, P.ry + 2, '#9a958b', b); ellipse(P.x, P.y, P.rx + 2, P.ry + 2, '#c9c4b8', b);
-  ellipse(P.x, P.y, P.rx + 1, P.ry + 1, '#4d93cc', b); ellipse(P.x, P.y + 1, P.rx, P.ry, '#7cc0ee', b); ellipse(P.x + 1, P.y + 2, P.rx - 6, P.ry - 4, '#6ab4e6', b);
-  for (let i = 0; i < 26; i++) { const a = i / 26 * Math.PI * 2; R(Math.round(P.x + Math.cos(a) * (P.rx + 2)) - 1, Math.round(P.y + Math.sin(a) * (P.ry + 2)), 2, 1, i % 3 ? '#b3ad9f' : '#dcd7cb', b); }
-  const pad = (x, y) => { ellipse(x, y, 3, 1, '#3f9d4a', b); R(x - 1, y - 1, 3, 1, '#5bb35a', b); R(x + 2, y, 1, 1, '#6ab4e6', b); };
-  pad(P.x - 11, P.y + 2); pad(P.x + 10, P.y + 4); R(P.x + 9, P.y + 2, 2, 1, '#ff9fb0', b); R(P.x + 9, P.y + 1, 1, 1, '#ffc4cf', b);
-  for (const [x, h] of [[P.x - P.rx + 1, 9], [P.x - P.rx + 3, 7], [P.x - P.rx + 5, 10]]) { R(x, P.y - 4 - h, 1, h, '#4f8f3a', b); R(x, P.y - 4 - h, 1, 3, '#7a4a2a', b); }
-  // plastic flamingo, bench, lamp, flower beds
-  { const fx0 = 46, fy = 135; R(fx0, fy - 7, 1, 7, '#c2577a', b); R(fx0 + 2, fy - 7, 1, 7, '#c2577a', b); ellipse(fx0 + 1, fy - 9, 3, 2, '#ff8fb1', b); R(fx0 - 2, fy - 10, 2, 1, '#ff6f9a', b);
-    R(fx0 + 3, fy - 15, 1, 6, '#ff8fb1', b); R(fx0 + 3, fy - 16, 2, 2, '#ff8fb1', b); R(fx0 + 5, fy - 15, 1, 2, K, b); R(fx0 + 4, fy - 16, 1, 1, K, b); }
-  const bed = (x, y, w) => { R(x, y, w, 4, '#8a5a3a', b); R(x, y, w, 1, '#9b6a45', b); for (let i = 1; i < w - 1; i += 2) R(x + i, y - (i % 4 ? 1 : 0), 1, 2, ['#ff4d4d', '#ffe066', '#ff9fb0', '#c9a2f5', '#ffffff'][i % 5], b); };
-  bed(54, 137, 30); bed(110, 138, 26);
-  const { x: BX, y: BY } = PARK.bench;
-  R(BX, BY, 18, 3, '#a0673a', b); R(BX, BY - 4, 18, 2, '#c0874a', b); R(BX + 1, BY + 3, 2, 4, K, b); R(BX + 15, BY + 3, 2, 4, K, b); R(BX, BY + 3, 18, 1, '#6e4321', b);
-  R(171, 118, 2, 18, '#4a5160', b); R(168, 116, 8, 3, '#4a5160', b); R(169, 119, 6, 1, '#ffe27a', b); ellipse(172, 136, 4, 1, 'rgba(40,80,40,.35)', b);
   // top wall for the HUD
   R(0, 0, LW, 12, '#b8c4d0', b); R(0, 12, LW, 1, '#8e9cab', b);
-  // bay strip
-  R(4, BAY_Y - 4, LW - 8, BAY_H + 8, '#4f5866', b); R(4, BAY_Y + BAY_H + 4, LW - 8, 2, '#3f4753', b);
-  // lot
-  R(0, LOT_TOP - 4, LW, LH - LOT_TOP + 4, '#8a94a3', b);
-  for (let i = 0; i < 700; i++) R(Math.floor(prand() * LW), LOT_TOP + Math.floor(prand() * (LH - LOT_TOP)), 1, 1, prand() < 0.5 ? '#828c9b' : '#929cab', b);
+  // transfer bays
+  R(4, BAY_Y - 4, LW - 8, BAY_H + 8, '#56657a', b); R(4, BAY_Y + BAY_H + 4, LW - 8, 2, '#435064', b);
+  for (let x = 6; x < LW - 6; x += 4) R(x, BAY_Y - 4, 2, 1, '#7d8ca1', b);
+  // corridor where the beds are jammed: big pale tiles
+  R(0, LOT_TOP - 4, LW, LH - LOT_TOP + 4, '#cad4de', b);
+  for (let y = LOT_TOP - 4; y < LH; y += 16) for (let x = 0; x < LW; x += 16) { if (((x + y) / 16) % 2 < 1) R(x, y, 16, 16, '#c3cdd8', b); R(x, y, 16, 1, '#b8c3cf', b); R(x, y, 1, 16, '#b8c3cf', b); }
+  for (let i = 0; i < 300; i++) R(Math.floor(prand() * LW), LOT_TOP + Math.floor(prand() * (LH - LOT_TOP)), 1, 1, prand() < 0.5 ? '#bcc6d1' : '#d4dce5', b);
+  // static parts of the decor
+  const D = id => DECOR.find(d => d.id === id);
+  { const d = D('tank'); R(d.x + 3, d.y + 19, 30, 7, '#8a6040', b); R(d.x + 3, d.y + 19, 30, 1, '#b5835a', b); R(d.x + 5, d.y + 26, 2, 0, K, b);
+    R(d.x - 1, d.y - 1, 38, 21, K, b); R(d.x, d.y, 36, 19, '#8fd0f0', b); R(d.x, d.y, 36, 2, '#c7ecfb', b); R(d.x, d.y + 15, 36, 4, '#e6c79a', b);
+    for (let i = 0; i < 18; i++) R(d.x + Math.floor(prand() * 35), d.y + 15 + Math.floor(prand() * 4), 1, 1, ['#ff9fb0', '#c9a2f5', '#fff', '#b5835a'][i % 4], b);
+    R(d.x + 26, d.y + 11, 6, 4, '#a7a39a', b); R(d.x + 27, d.y + 12, 2, 2, '#5f5a54', b); ellipse(d.x + 18, d.y + 28, 16, 1, 'rgba(20,40,40,.2)', b); }
+  { const d = D('wheelchair'); ellipse(d.x + 9, d.y + 16, 9, 1, 'rgba(20,40,40,.18)', b); }
+  { const d = D('dog'); ellipse(d.x + 13, d.y + 13, 13, 3, '#f4a6b8', b); ellipse(d.x + 13, d.y + 13, 11, 2, '#ffc4cf', b); }
+  { const d = D('sleeper'); for (const cx of [d.x + 2, d.x + 16]) { R(cx, d.y + 14, 12, 3, '#3a86ff', b); R(cx, d.y + 6, 12, 8, '#2a5fc0', b); R(cx, d.y + 6, 12, 1, '#8ab8ff', b); R(cx + 1, d.y + 17, 1, 6, '#6c7484', b); R(cx + 10, d.y + 17, 1, 6, '#6c7484', b); }
+    ellipse(d.x + 15, d.y + 24, 15, 1, 'rgba(20,40,40,.18)', b); }
+  { const d = D('plant'); ellipse(d.x + 10, d.y + 43, 9, 2, 'rgba(20,40,40,.2)', b); R(d.x + 4, d.y + 32, 12, 11, '#c0673a', b); R(d.x + 3, d.y + 31, 14, 3, '#d98a5a', b); R(d.x + 4, d.y + 42, 12, 1, '#8a4a2a', b); }
+  { const d = D('vending'); R(d.x - 1, d.y, d.w + 2, d.h + 1, K, b); R(d.x, d.y + 1, d.w, d.h - 1, '#e8424f', b); R(d.x, d.y + 1, d.w, 1, '#ff8a8f', b);
+    R(d.x + 2, d.y + 3, 8, 15, '#cfe9f7', b); for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) R(d.x + 3 + c * 2 + (c > 0 ? c - 1 : 0), d.y + 4 + r * 4, 2, 2, ['#ffd23f', '#3a86ff', '#4ade80', '#ff7eb6'][(r + c) % 4], b);
+    R(d.x + 11, d.y + 4, 3, 2, '#334155', b); for (let r = 0; r < 3; r++) R(d.x + 12, d.y + 8 + r * 3, 1, 1, '#ffe066', b); R(d.x + 2, d.y + 20, 8, 3, '#7e1c2a', b); }
+  { const d = D('coffee'); R(d.x, d.y + 12, 17, 2, '#b5835a', b); R(d.x + 1, d.y + 14, 1, 9, '#8a6040', b); R(d.x + 15, d.y + 14, 1, 9, '#8a6040', b); R(d.x, d.y + 12, 17, 1, '#d9a87a', b);
+    R(d.x + 2, d.y + 2, 8, 10, '#3a3f4b', b); R(d.x + 3, d.y + 3, 6, 2, '#6c7484', b); R(d.x + 4, d.y + 8, 4, 3, '#2b2238', b); R(d.x + 5, d.y + 7, 1, 1, '#ff4d4d', b);
+    R(d.x + 11, d.y + 8, 4, 4, '#fff', b); R(d.x + 15, d.y + 9, 1, 2, '#fff', b); R(d.x + 12, d.y + 8, 2, 1, '#6e4321', b); }
+  { const d = D('clock'); disc(d.x + 5, d.y + 5, 5, K, b); disc(d.x + 5, d.y + 5, 4, '#fff', b); for (const [dx, dy] of [[0, -3], [3, 0], [0, 3], [-3, 0]]) R(d.x + 5 + dx, d.y + 5 + dy, 1, 1, '#94a3b8', b); }
 }
-// cloud shadow stamp, drawn translucent over the park
-const cloudShadow = (() => { const c = document.createElement('canvas'); c.width = 60; c.height = 22; const g = c.getContext('2d');
-  ellipse(18, 12, 16, 8, '#1d3b26', g); ellipse(34, 9, 16, 8, '#1d3b26', g); ellipse(44, 13, 13, 7, '#1d3b26', g); return c; })();
-// live park: pond shimmer, ducks, swaying trees, bench sitter
-let duckHop = -9;
-function drawDuck(x, y, f, baby, dabble) {
-  const M = (dx, dy, w, h, col) => R(f > 0 ? x + dx : x - dx - w + 1, y + dy, w, h, col);
-  if (baby) { M(0, 0, 3, 2, '#ffe066'); M(2, -2, 2, 2, '#ffe066'); M(4, -1, 1, 1, '#ff9a1f'); M(3, -2, 1, 1, K); M(-1, 2, 5, 1, '#b9e1fb'); return; }
-  if (dabble) { M(1, 1, 5, 2, '#fff'); M(2, -1, 2, 2, '#fff'); M(2, -2, 1, 1, '#e3e9ef'); M(1, 3, 6, 1, '#b9e1fb'); return; }
-  M(0, 0, 6, 3, '#fff'); M(1, 1, 3, 1, '#e3e9ef'); M(-1, -1, 1, 1, '#fff'); M(4, -3, 3, 3, '#fff'); M(5, -2, 1, 1, K); M(7, -2, 2, 1, '#ff9a1f'); M(-1, 3, 8, 1, '#b9e1fb');
-}
-function drawPark() {
-  const P = PARK.pond;
-  for (let i = 0; i < 5; i++) { if ((Math.floor(T * 1.5) + i) % 4 === 0) continue;
-    const x = Math.round(P.x - 13 + ((i * 7 + T * 2.5) % 24)), y = P.y - 3 + (i * 3) % 8; R(x, y, 2 + (i % 2), 1, '#b9e1fb'); }
-  // mum and ducklings paddle round the pond
-  const hop = Math.max(0, 1 - (T - duckHop) / 0.35);
-  [0, 0.55, 0.95].forEach((lag, i) => {
-    const a = T * 0.35 - lag, x = Math.round(P.x + Math.cos(a) * 10), f = -Math.sin(a) > 0 ? 1 : -1;
-    const y = Math.round(P.y + 1 + Math.sin(a) * 3.5) + (Math.floor(T * 2 + i) % 2) - (i === 0 ? Math.round(Math.sin(hop * Math.PI) * 4) : 0);
-    if (i === 0) { const u = (T * 0.7) % 1.6; if (u < 1) { ctx.globalAlpha = 1 - u;
-      for (let k = 0; k < 16; k++) { const b2 = k / 16 * Math.PI * 2; R(Math.round(x + 2 + Math.cos(b2) * (4 + u * 5)), Math.round(y + 2 + Math.sin(b2) * (1 + u * 2)), 1, 1, '#d6efff'); } ctx.globalAlpha = 1; } }
-    drawDuck(x, y, f, i > 0, i === 0 && T % 9 < 1.4 && hop === 0);
-  });
-  // tree canopies sway a pixel in the breeze
-  for (const [tx, ty, s, ph] of PARK.trees) { const sw = Math.round(Math.sin(T * 1.3 + ph) * 0.8);
-    disc(tx, Math.round(ty - 12 * s), Math.round(10 * s), '#2f7a3a');
-    disc(Math.round(tx - 4 * s) + sw, Math.round(ty - 15 * s), Math.round(7 * s), '#3f9d4a'); disc(Math.round(tx + 5 * s) + sw, Math.round(ty - 10 * s), Math.round(6 * s), '#3f9d4a');
-    disc(Math.round(tx - 5 * s) + sw, Math.round(ty - 17 * s), Math.round(3 * s), '#6cc56f'); R(Math.round(tx + 3 * s) + sw, Math.round(ty - 13 * s), 1, 1, '#ff6b6b'); }
-  // someone on the bench, seeing stars
-  const { x: BX, y: BY } = PARK.bench, img = Sprites.patient(deptByName('Neuro'), 2, Math.floor(T * 6) % 2, false);
-  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, LW, BY + 2); ctx.clip(); ctx.drawImage(img, BX + 2, BY - img.height + 5); ctx.restore();
-}
-function drawParkOverlay() {
-  // cloud shadows drift over everything in the park, then butterflies
-  ctx.save(); ctx.beginPath(); ctx.rect(0, 13, LW, BAY_Y - 17); ctx.clip(); ctx.globalAlpha = 0.09;
-  [[0, 34, 5], [110, 104, 3.5]].forEach(([x0, y, sp]) => ctx.drawImage(cloudShadow, Math.round(((x0 + T * sp) % (LW + 70)) - 65), y));
-  ctx.restore(); ctx.globalAlpha = 1;
-  ['#ff9fb0', '#ffe066', '#c9a2f5'].forEach((col, i) => {
-    const x = Math.round(97 + Math.sin(T * 0.23 + i * 2.1) * 88 + Math.sin(T * 1.7 + i) * 4), y = Math.round(78 + Math.sin(T * 0.31 + i * 3.7) * 56 + Math.sin(T * 2.3 + i) * 3);
-    R(x, y, 1, 2, K); if (Math.floor(T * 10 + i * 3) % 2) { R(x - 2, y - 1, 2, 2, col); R(x + 1, y - 1, 2, 2, col); } else { R(x - 1, y - 1, 1, 2, col); R(x + 1, y - 1, 1, 2, col); }
-  });
+// live decor: animated every frame, with a little reaction when tapped
+function drawDecor() {
+  const D = id => DECOR.find(d => d.id === id), age = d => T - d.tap;
+  // fish tank: weed sways, fish swim, bubbles rise; tapping sends the fish darting and a burst of bubbles
+  { const d = D('tank'), a = age(d), fast = a < 1.2 ? 3 : 1;
+    for (const [px, h] of [[6, 9], [9, 6], [31, 8]]) for (let k = 0; k < h; k++) R(d.x + px + Math.round(Math.sin(T * 2 + k * 0.6 + px) * (k / h) * 1.5), d.y + 15 - k, 1, 1, k % 3 ? '#3f9d4a' : '#5bb35a');
+    [['#ff8c42', 0, 5, 9], ['#ffd23f', 2.1, 9, 7], ['#3a86ff', 4.2, 12, 11]].forEach(([col, ph, fy, sp], i) => {
+      d['fx' + i] = (d['fx' + i] ?? ph * 5) + 1 / 60 * sp * fast;
+      const u = (d['fx' + i] % 56), right = u < 28, x = d.x + 3 + Math.round(right ? u : 56 - u), y = d.y + fy + Math.round(Math.sin(T * 2 + ph));
+      R(x, y, 3, 2, col); R(right ? x - 1 : x + 3, y, 1, 2, col); R(right ? x + 2 : x, y, 1, 1, K); });
+    const n = a < 1.5 ? 10 : 3;
+    for (let i = 0; i < n; i++) { const u = ((T * (a < 1.5 ? 1.4 : 0.5) + i * 0.37) % 1), bx = d.x + 4 + ((i * 11) % 30), by = d.y + 15 - Math.round(u * 13);
+      R(bx + Math.round(Math.sin(u * 9 + i)), by, 1, 1, '#e8f8ff'); }
+    R(d.x + 1, d.y + 2, 1, 10, 'rgba(255,255,255,.55)'); R(d.x + 3, d.y + 2, 1, 4, 'rgba(255,255,255,.4)'); }
+  // wet floor sign: tap and it wobbles, falls over, then pops back up
+  { const d = D('wet'), a = age(d), Y = '#ffd23f';
+    if (a > 0.25 && a < 1.3) { R(d.x - 4, d.y + 11, 16, 6, K); R(d.x - 3, d.y + 12, 14, 4, Y); R(d.x + 2, d.y + 13, 3, 2, K); }
+    else { const wob = a < 0.25 ? Math.round(Math.sin(a * 60)) : 0, x = d.x + wob;
+      R(x + 1, d.y, 9, 16, K); R(x + 2, d.y + 1, 7, 14, Y); R(x + 2, d.y + 1, 7, 1, '#fff1b0');
+      R(x + 5, d.y + 3, 1, 1, K); R(x + 4, d.y + 5, 3, 1, K); R(x + 5, d.y + 6, 1, 2, K); R(x + 3, d.y + 8, 1, 1, K); R(x + 6, d.y + 8, 2, 1, K); R(x + 2, d.y + 11, 7, 1, '#d9a400'); } }
+  // wheelchair: rolls forward and back when tapped
+  { const d = D('wheelchair'), a = age(d), u = a < 1.4 ? Math.sin(a / 1.4 * Math.PI) : 0, x = d.x + Math.round(u * 7), spin = a < 1.4 ? a * 12 : 0;
+    R(x + 11, d.y + 1, 2, 9, '#6c7484'); R(x + 10, d.y, 3, 2, '#3a3f4b'); R(x + 3, d.y + 6, 9, 3, '#3a86ff'); R(x + 3, d.y + 6, 9, 1, '#8ab8ff'); R(x + 2, d.y + 9, 2, 4, '#6c7484');
+    disc(x + 9, d.y + 11, 4, '#3a3f4b'); disc(x + 9, d.y + 11, 3, '#c8ced8'); disc(x + 9, d.y + 11, 1, '#3a3f4b');
+    for (let k = 0; k < 2; k++) { const ang = spin + k * Math.PI / 2; R(x + 9 + Math.round(Math.cos(ang) * 2), d.y + 11 + Math.round(Math.sin(ang) * 2), 1, 1, '#6c7484'); R(x + 9 - Math.round(Math.cos(ang) * 2), d.y + 11 - Math.round(Math.sin(ang) * 2), 1, 1, '#6c7484'); }
+    disc(x + 2, d.y + 14, 1, '#3a3f4b'); }
+  // therapy corgi: tail wags; tap for a hop and a heart
+  { const d = D('dog'), a = age(d), hop = a < 0.4 ? Math.round(Math.sin(a / 0.4 * Math.PI) * 4) : 0, x = d.x + 4, y = d.y + 4 - hop, wag = Math.floor(T * (a < 2 ? 16 : 5)) % 2;
+    const O = '#f0a050', W = '#fff4e6';
+    R(x + 2, y + 3, 12, 5, O); R(x + 4, y + 6, 8, 2, W); R(x + 5, y + 3, 6, 3, '#3a86ff'); R(x + 7, y + 3, 2, 3, '#fff'); R(x + 6, y + 4, 4, 1, '#fff');
+    R(x + 13, y, 5, 5, O); R(x + 15, y + 3, 4, 2, W); R(x + 18, y + 3, 1, 1, K); R(x + 16, y + 1, 1, 1, K); R(x + 13, y - 2, 2, 2, O); R(x + 16, y - 2, 2, 2, O); R(x + 14, y - 1, 1, 1, '#ffc4cf');
+    R(x + 3, y + 8, 2, 2, O); R(x + 11, y + 8, 2, 2, O); R(x, y + 2 + wag, 2, 2, O);
+    if (a < 1.2) { const hy = Math.round(d.y - 4 - a * 10); ctx.globalAlpha = a < 0.9 ? 1 : (1.2 - a) / 0.3; R(x + 15, hy, 2, 1, '#ff4d6d'); R(x + 18, hy, 2, 1, '#ff4d6d'); R(x + 14, hy + 1, 7, 2, '#ff4d6d'); R(x + 15, hy + 3, 5, 1, '#ff4d6d'); R(x + 16, hy + 4, 3, 1, '#ff4d6d'); R(x + 17, hy + 5, 1, 1, '#ff4d6d'); ctx.globalAlpha = 1; } }
+  // tired visitor asleep across the chairs: Zzz; tap and they jolt awake
+  { const d = D('sleeper'), a = age(d), awake = a < 1.6, img = Sprites.patient(deptByName('Ortho'), 2, 0, false), jolt = a < 0.2 ? 2 : 0;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, LW, d.y + 16); ctx.clip(); ctx.drawImage(img, d.x + 9, d.y + 16 - img.height + 6 - jolt); ctx.restore();
+    if (awake) { R(d.x + 22, d.y - 6, 2, 5, '#e8424f'); R(d.x + 22, d.y, 2, 1, '#e8424f'); }
+    else for (let k = 0; k < 3; k++) { const u = (T * 0.5 + k / 3) % 1; ctx.globalAlpha = 1 - u; Font.small(ctx, 'Z', d.x + 20 + Math.round(u * 6 + Math.sin(u * 6) * 1.5), d.y - 2 - Math.round(u * 10), '#4f5563'); } ctx.globalAlpha = 1; }
+  // potted plant: sways; tapping shakes it and drops a leaf
+  { const d = D('plant'), a = age(d), shake = a < 0.6 ? Math.round(Math.sin(a * 50) * 2) : Math.round(Math.sin(T * 1.2) * 0.7), cx = d.x + 10;
+    R(cx, d.y + 16, 1, 16, '#3f8f43');
+    for (const [lx, ly, r, sw] of [[-5, 10, 5, 1], [5, 8, 5, 1], [-2, 2, 4, 1.5], [4, 18, 4, 0.6], [-5, 20, 4, 0.6]]) {
+      const ox = Math.round(shake * sw); disc(cx + lx + ox, d.y + ly + 4, r, '#2f7a3a'); disc(cx + lx + ox - 1, d.y + ly + 3, r - 2, '#4fae55'); R(cx + lx + ox, d.y + ly + 2, 1, r, '#2f7a3a'); } }
+  // vending machine: a can drops into the tray
+  { const d = D('vending'), a = age(d);
+    if (a < 0.45) R(d.x + 5, d.y + 6 + Math.round((a / 0.45) ** 2 * 14), 3, 2, '#ff7eb6'); else if (a < 3) R(d.x + 4, d.y + 21, 3, 2, '#ff7eb6');
+    if (Math.floor(T * 1.3) % 7 === 0) R(d.x + 2, d.y + 3, 8, 15, 'rgba(255,255,255,.25)'); }
+  // coffee machine: a wisp of steam; tap for a fresh brew
+  { const d = D('coffee'), a = age(d);
+    for (let k = 0; k < 4; k++) { const u = (T * 0.8 + k / 4) % 1; ctx.globalAlpha = (1 - u) * 0.8; R(d.x + 13 + Math.round(Math.sin(u * 7 + k) * 1.5), d.y + 7 - Math.round(u * 8), 1, 1, '#fff'); } ctx.globalAlpha = 1;
+    if (a < 1) { if (Math.floor(a * 8) % 2 === 0) R(d.x + 6, d.y + 11, 1, 1, '#6e4321'); } }
+  // wall clock shows the real time; tap and time flies
+  { const d = D('clock'), a = age(d), now = new Date(), extra = a < 1 ? a * 40 : 0;
+    const mAng = (now.getMinutes() / 60) * Math.PI * 2 + extra * 2, hAng = ((now.getHours() % 12) / 12 + now.getMinutes() / 720) * Math.PI * 2 + extra / 6;
+    for (let k = 1; k <= 3; k++) R(d.x + 5 + Math.round(Math.sin(mAng) * k), d.y + 5 - Math.round(Math.cos(mAng) * k), 1, 1, K);
+    for (let k = 1; k <= 2; k++) R(d.x + 5 + Math.round(Math.sin(hAng) * k), d.y + 5 - Math.round(Math.cos(hAng) * k), 1, 1, '#e8424f'); R(d.x + 5, d.y + 5, 1, 1, K); }
+  // the charge nurse at the station, typing away behind the sign
+  { const img = Sprites.staff('nurse', HAIR.Becca, 0, true), bob = Math.floor(T * 4) % 2;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, LW, LOOP.cy + 13); ctx.clip(); ctx.drawImage(img, LOOP.cx + 18, LOOP.cy + 13 - 14 + bob); ctx.restore();
+    // desk with monitors in front of them
+    R(LOOP.cx + 10, LOOP.cy + 12, 30, 5, '#b98b5e'); R(LOOP.cx + 10, LOOP.cy + 12, 30, 1, '#d9b38c'); R(LOOP.cx + 10, LOOP.cy + 17, 30, 1, '#8a6040');
+    R(LOOP.cx - 39, LOOP.cy + 12, 30, 5, '#b98b5e'); R(LOOP.cx - 39, LOOP.cy + 12, 30, 1, '#d9b38c'); R(LOOP.cx - 39, LOOP.cy + 17, 30, 1, '#8a6040');
+    for (const mx of [LOOP.cx - 33, LOOP.cx - 22]) { R(mx - 1, LOOP.cy + 4, 10, 8, K); R(mx, LOOP.cy + 5, 8, 6, '#14202e'); R(mx + 3, LOOP.cy + 12, 2, 1, K);
+      const h = Math.floor(T * 10 + mx) % 8; for (let k = 0; k < 8; k++) R(mx + k, LOOP.cy + 8 - (k === h ? 2 : 0), 1, 1, k === h ? '#c9ffd9' : '#3ddc84'); } }
 }
 function paintLotOutline(shape) {
   // faint painted boundary of this level's lot shape
@@ -751,7 +781,7 @@ function drawPeople(list) {
 }
 function drawPlay() {
   ctx.drawImage(playBg, 0, 0);
-  drawPark();
+  drawDecor();
   // the centre sign glints now and then to hint it can be tapped
   { const g = (T % 5) / 0.6; if (g < 1) { const x = Math.round(SIGN.x + g * (SIGN.w + 8)) - 4; for (let k = 0; k < 4; k++) if (x + k >= SIGN.x && x + k < SIGN.x + SIGN.w) R(x + k, SIGN.y + 3 - k + 4, 1, 4, 'rgba(255,255,255,.35)'); } }
   // bays
@@ -760,7 +790,7 @@ function drawPlay() {
     R(bx, BAY_Y, BAY_W, BAY_H, locked ? '#3d4450' : '#5d6776');
     if (locked) { for (let k = 0; k < BAY_H; k += 4) { R(bx, BAY_Y + k, 1, 2, '#6b7584'); R(bx + BAY_W - 1, BAY_Y + k, 1, 2, '#6b7584'); }
       const pulse = i === G.open && Math.floor(T * 3) % 2; R(bx + 11, BAY_Y + 10, 4, 10, pulse ? '#4ade80' : '#22c55e'); R(bx + 8, BAY_Y + 13, 10, 4, pulse ? '#4ade80' : '#22c55e');
-      Font.smallCentered(ctx, '-' + UNLOCK_COST, bayCx(i), BAY_Y + 26, '#ff8a8f');
+      Font.smallCentered(ctx, '-' + fmt(unlockCost(i)), bayCx(i), BAY_Y + 26, '#ff8a8f');
       continue; }
     for (let k = 0; k < BAY_H; k++) { R(bx, BAY_Y + k, 1, 1, '#e6e9ee'); R(bx + BAY_W - 1, BAY_Y + k, 1, 1, '#e6e9ee'); }
     if (bb.state === 'parked' || bb.state === 'full') {
@@ -795,7 +825,6 @@ function drawPlay() {
     let x, y; if (t < 0.45) { const u = t / 0.45; x = lerp(fl.x, DOOR.x, u); y = lerp(fl.y, DOOR.y, u); } else { const u = (t - 0.45) / 0.55; x = lerp(DOOR.x, bx, u); y = lerp(DOOR.y, by, u) - Math.sin(u * Math.PI) * 6; }
     walkers.push({ x, y, dept: fl.dept, left: false, f: Math.floor(T * 10) % 4 }); }
   drawPeople(walkers);
-  drawParkOverlay();
   // moving vehicles on top
   for (const v of G.vehicles) if (v.state === 'exit' || v.state === 'route') drawVehicle(v, v.px, v.py, v.away ? { siren: Math.floor(T * 10) % 2 === 0 } : {});
   G.bays.forEach((bb, i) => { if (bb.state !== 'leaving') return; const t = bb.t, v = bb.v, flash = Math.floor(t * 10) % 2 === 0, ax = bayCx(i), ay = bayCy();
@@ -881,7 +910,7 @@ function drawEnd(won) {
     button('NEXT SHIFT', 97, y + h - 40, 96, '#22a35a', () => { Sound.sfx.click(); startLevel(level + 1); screen = 'card'; overlayT = 0; Sound.play('title'); });
     button('REPLAY', 97, y + h - 20, 96, '#64748b', () => { Sound.sfx.click(); startLevel(level); screen = 'card'; overlayT = 0; }); }
   else { let by = y + h - (canOpen ? 40 : 20);
-    if (canOpen) { button('OPEN A BAY -' + UNLOCK_COST, 97, by, 130, '#22a35a', () => { G.over = null; unlockBay(); screen = 'play'; }); by += 20; }
+    if (canOpen) { button('OPEN A BAY -' + fmt(unlockCost(G.open)), 97, by, 130, '#22a35a', () => { G.over = null; unlockBay(); screen = 'play'; }); by += 20; }
     button('TRY AGAIN', 97, by, 130, '#c0392b', () => { Sound.sfx.click(); startLevel(level); screen = 'card'; overlayT = 0; }); }
   drawConfetti();
 }
@@ -910,7 +939,7 @@ function drawLegend() {
     ctx.globalAlpha = 1;
   });
   const fy = y + 22 + DEPTS.length * RH;
-  Font.smallCentered(ctx, "GREY ? AMBULANCES ARE TRIAGE.", 97, fy, '#94a3b8'); Font.smallCentered(ctx, "FREE THEIR ROAD TO SEE WHO THEY'RE FOR.", 97, fy + 7, '#94a3b8');
+  Font.smallCentered(ctx, "GREY ? BEDS ARE TRIAGE.", 97, fy, '#94a3b8'); Font.smallCentered(ctx, "FREE THEIR ROAD TO SEE WHO THEY'RE FOR.", 97, fy + 7, '#94a3b8');
   const back = () => { Sound.sfx.click(); screen = 'play'; };
   button('BACK TO WORK', 97, y + h - 20, 100, '#22a35a', back);
   addButton(0, 0, LW, LH, back); buttons.unshift(buttons.pop());
@@ -927,7 +956,8 @@ cv.addEventListener('pointerdown', e => {
   if (screen !== 'play' || G.over) return;
   if (cameoTap(p)) return;
   if (p.y < LOT_TOP - 4) taps.push({ x: p.x, y: p.y, t: 0 });
-  if (inPond(p.x, p.y)) { duckHop = T; Sound.sfx.quack(); G.floats.push({ text: 'QUACK!', x: PARK.pond.x + 6, y: PARK.pond.y - 18, t: 0.3, col: '#fff' }); return; }
+  const dec = decorAt(p.x, p.y);
+  if (dec) { if (T - dec.tap > 0.3) { dec.tap = T; DECOR_SFX[dec.id](); if (dec.id === 'plant') leaf(dec.x + 10, dec.y + 10); if (dec.id === 'coffee') puff(dec.x + 13, dec.y + 4, 5); } return; }
   let best = null, bd = Infinity;
   for (const v of onLot()) {
     const a = -v.dir * Math.PI / 4, c = Math.cos(a), s = Math.sin(a), lx = (p.x - v.x) * c - (p.y - v.y) * s, ly = (p.x - v.x) * s + (p.y - v.y) * c;
@@ -958,6 +988,6 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-window.AJ = { get G() { return G; }, get screen() { return screen; }, set screen(s) { screen = s; }, startLevel, tapVehicle, update, onLot, lose };
+window.AJ = { get G() { return G; }, get screen() { return screen; }, set screen(s) { screen = s; }, startLevel, tapVehicle, update, onLot, lose, unlock: unlockBay };
 // iOS only unlocks audio on certain gestures; make sure a touchend also tries
 addEventListener('touchend', () => Sound.init(), { passive: true });
