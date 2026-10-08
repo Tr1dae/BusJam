@@ -2,11 +2,11 @@
 
 An ad-free, pixel-art traffic puzzle for phones, set at St. Becca's General.
 
-Ambulances are jammed in the car park. Tap one to drive it out the way its arrow points; if the road is clear it parks in a bay. Patients walk the loop four abreast, and anyone whose department's ambulance is parked steps out at the entrance and boards. Ambulances carry 16, 24 or 40 patients, and patients arrive in solid department blocks. Full ambulances reverse out and race off with the sirens going. Clear the lot to finish the shift.
+Ambulances are jammed in the car park. Tap one to drive it out the way its arrow points; if the road is clear it parks in a bay. Patients walk the loop four abreast, and anyone whose department's ambulance is parked steps out at the entrance and boards. Ambulances carry 16, 24 or 40 patients, and patients arrive in solid department blocks. Each ambulance fills completely before the next one of its department starts boarding. Full ambulances reverse out and race off with the sirens going. Clear the lot to finish the shift.
 
 - **Departments:** Cardiac (heart pillow), Neuro (head wrap, seeing stars), Ortho (cast and sling), Peds (teddy), Maternity (very pregnant), Burns (on fire).
 - **Quirks:** triage-pending grey ambulances (shift 3+), flip-floppers that turn around every move (shift 5+), and the Code Blue crash cart with a move counter (shift 7+).
-- **Spare bay:** one free extra bay per shift, also offered when you get stuck.
+- **Bays and score:** 4 bays are open and 2 are locked. Opening one costs 500 points; any left locked at the end of a shift are worth +500 each. Patients score 10 each, departures 5 per seat, a cleared shift 1,000, and the career total is saved.
 - **Levels** are generated from the shift number and always solvable: vehicles are packed, then "peeled" off in an order that is guaranteed to work, and a checker rejects any layout with head-on blocks or cycles.
 
 ## Running it

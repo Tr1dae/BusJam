@@ -29,7 +29,7 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 // ---------- layout ----------
 const LOOP = { cx: 97, cy: 80, rx: 56, ry: 38 };
 const LANES = [-10.5, -3.5, 3.5, 10.5], ROW = 9, LOOP_SPEED = 30;
-const BAY_Y = 148, BAY_W = 26, BAY_H = 38, LOT_TOP = 194, SLOTS = 6, OPEN = 5;
+const BAY_Y = 148, BAY_W = 26, BAY_H = 38, LOT_TOP = 194, SLOTS = 6, OPEN = 4, UNLOCK_COST = 500;
 const bayX = i => 10 + i * 30, bayCx = i => bayX(i) + 13, bayCy = () => BAY_Y + 19;
 const LOT = { cx: 97, cy: Math.round((LOT_TOP + LH - 4) / 2), rx: 92, ry: Math.round((LH - 4 - LOT_TOP) / 2) - 2 };
 const DOOR = { x: LOOP.cx, y: LOOP.cy + LOOP.ry + 8 };
@@ -76,7 +76,7 @@ const BLURBS = [
 const WIN_LINES = ["They'll be back.", 'Beds are clean. For eleven minutes.', 'Handover done. Not your problem anymore.', "Everyone's where they belong. Suspicious."];
 const LOSE_LINES = ['Somebody page the charge nurse.', "Time for a coffee you won't finish.", 'Code Brown in the parking lot.'];
 const INTROS = {
-  1: 'Tap an ambulance to drive it out. Patients board the ambulance for their department. Full ones leave. Clear the lot!',
+  1: 'Tap an ambulance to drive it out. Patients board the ambulance for their department. Full ones leave. Clear the lot! Locked bays open for 500 points each.',
   3: 'New: triage pending. Grey ambulances hide their department until the road ahead is clear.',
   5: 'New: flip-floppers. Ambulances with the yellow arrows turn around every time you send another one off.',
   7: 'New: code blue! The crash cart has to leave before its counter hits zero. Every move counts.',
@@ -90,7 +90,7 @@ try { level = parseInt(new URLSearchParams(location.search).get('level')) || par
 function startLevel(n) {
   level = n; try { localStorage.setItem('aj.level', n); } catch (e) {}
   const gen = generateLevel(n, LOT);
-  G = { n, cfg: gen.cfg, vehicles: gen.vehicles, offset: 0, rows: [], funnels: [], bays: [], open: OPEN, bonusUsed: false,
+  G = { n, cfg: gen.cfg, vehicles: gen.vehicles, offset: 0, rows: [], funnels: [], bays: [], open: OPEN, score: 0, shown: 0, floats: [], bonus: 0,
         flyers: [], pops: [], over: null, moves: 0, blurb: pick(BLURBS), endLine: '' };
   for (const v of G.vehicles) { v.state = 'lot'; v.px = v.x; v.py = v.y; v.revealed = !v.mystery; v.bumpT = 0; v.shake = 0; v.flipAnim = 0; }
   for (let i = 0; i < SLOTS; i++) G.bays.push({ state: 'empty', t: 0 });
@@ -136,13 +136,20 @@ function afterMove(moved) {
   }
   revealCheck();
 }
-function useBonus() {
-  if (G.bonusUsed) { flash('SPARE BAY ALREADY USED'); Sound.sfx.nope(); return; }
-  G.bonusUsed = true; G.open = SLOTS; flash('SPARE BAY OPEN!'); Sound.sfx.bonus();
+let career = 0; try { career = parseInt(localStorage.getItem('aj.total')) || 0; } catch (e) {}
+const fmt = n => (n < 0 ? '-' : '') + String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+function addScore(pts, x, y, big) { G.score += pts; if (big) G.floats.push({ text: (pts > 0 ? '+' : '') + fmt(pts), x, y, t: 0, col: pts < 0 ? '#ff4d4d' : '#ffe066' }); }
+function unlockBay() {
+  if (G.open >= SLOTS) return;
+  G.open++; addScore(-UNLOCK_COST, bayCx(G.open - 1), BAY_Y + 10, true);
+  flash('BAY OPENED  -' + UNLOCK_COST); Sound.sfx.bonus();
 }
 function buzz(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
 function flash(msg) { toast = { msg, t: 1.6 }; }
-function win() { G.over = 'win'; G.endLine = pick(WIN_LINES); overlayT = 0; Sound.sfx.win(); setTimeout(() => { if (screen === 'play') screen = 'win'; }, 500); }
+function win() {
+  const locked = SLOTS - G.open; G.bonus = locked * UNLOCK_COST; G.score += 1000 + G.bonus;
+  career += G.score; try { localStorage.setItem('aj.total', career); } catch (e) {}
+  G.over = 'win'; G.endLine = pick(WIN_LINES); overlayT = 0; Sound.sfx.win(); setTimeout(() => { if (screen === 'play') screen = 'win'; }, 500); }
 function lose(why) { G.over = why; G.endLine = why === 'code' ? 'The crash cart got boxed in.' : pick(LOSE_LINES); overlayT = 0;
   if (why === 'code') Sound.sfx.flatline(); else Sound.sfx.lose(); setTimeout(() => { if (screen === 'play') screen = 'lose'; }, 400); }
 
@@ -150,6 +157,8 @@ function lose(why) { G.over = why; G.endLine = why === 'code' ? 'The crash cart 
 const insideLot = (x, y) => G.cfg.shape((x - LOT.cx) / LOT.rx, (y - LOT.cy) / LOT.ry);
 function update(dt) {
   T += dt; if (toast) toast.t -= dt; overlayT += dt;
+  if (G) { G.shown += (G.score - G.shown) * Math.min(1, dt * 6); if (Math.abs(G.score - G.shown) < 1) G.shown = G.score;
+    G.floats.forEach(f => { f.t += dt; f.y -= 14 * dt; }); G.floats = G.floats.filter(f => f.t < 1.4); }
   if (!G || screen !== 'play') return;
   for (const v of G.vehicles) {
     if (v.shake > 0) v.shake = Math.max(0, v.shake - dt);
@@ -167,7 +176,7 @@ function update(dt) {
       const wp = v.route[0], dx = wp.x - v.px, dy = wp.y - v.py, d = Math.hypot(dx, dy), step = 260 * dt;
       if (d > 0.5) v.dir = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
       if (d <= step) { v.px = wp.x; v.py = wp.y; v.route.shift();
-        if (!v.route.length) { v.state = 'parked'; v.dir = 6; const b = G.bays[v.bay]; b.state = 'parked'; b.seats = v.cap; b.filled = 0; b.t = 0; Sound.sfx.park(); } }
+        if (!v.route.length) { v.state = 'parked'; v.dir = 6; const b = G.bays[v.bay]; b.state = 'parked'; b.seats = v.cap; b.filled = 0; b.t = 0; b.parkedAt = T; Sound.sfx.park(); } }
       else { v.px += dx / d * step; v.py += dy / d * step; }
     }
   }
@@ -180,7 +189,9 @@ function update(dt) {
       const q = at(loopPath, b);
       row.lanes.forEach((on, l) => {
         if (!on) return;
-        const bi = G.bays.findIndex((bb, k) => k < G.open && bb.state === 'parked' && bb.v.dept === row.dept && bb.seats > 0);
+        // fill one ambulance at a time: the one that has been waiting longest
+        let bi = -1;
+        G.bays.forEach((bb, k) => { if (k < G.open && bb.state === 'parked' && bb.v.dept === row.dept && bb.seats > 0 && (bi < 0 || bb.parkedAt < G.bays[bi].parkedAt)) bi = k; });
         if (bi < 0) return;
         G.bays[bi].seats--; row.lanes[l] = false;
         const p = laneXY(q, l);
@@ -198,7 +209,7 @@ function update(dt) {
   for (const fl of G.flyers) {
     fl.t += dt / 0.7;
     if (fl.t >= 1 && !fl.done) {
-      fl.done = true; const bb = G.bays[fl.bay]; bb.filled++;
+      fl.done = true; const bb = G.bays[fl.bay]; bb.filled++; addScore(10);
       Sound.sfx.board(Math.floor(bb.filled / bb.v.cap * 9)); G.pops.push({ dept: fl.dept, x: bayCx(fl.bay) + (Math.random() - 0.5) * 8, y: BAY_Y + 6, t: 0, vx: (Math.random() - 0.5) * 16 });
       if (bb.filled >= bb.v.cap) { bb.state = 'full'; bb.t = 0; }
     }
@@ -207,7 +218,7 @@ function update(dt) {
   G.pops.forEach(p => { p.t += dt; p.x += p.vx * dt; p.y -= 24 * dt; }); G.pops = G.pops.filter(p => p.t < 0.9);
   G.bays.forEach(bb => {
     bb.t += dt;
-    if (bb.state === 'full' && bb.t > 0.35) { bb.state = 'leaving'; bb.t = 0; Sound.sfx.siren(); }
+    if (bb.state === 'full' && bb.t > 0.35) { bb.state = 'leaving'; bb.t = 0; Sound.sfx.siren(); addScore(bb.v.cap * 5, bayCx(G.bays.indexOf(bb)), BAY_Y + 6, true); }
     else if (bb.state === 'leaving' && bb.t > 1.6) { bb.v.state = 'gone'; Object.assign(bb, { state: 'empty', v: null, t: 0 }); }
   });
   if (G.over) return;
@@ -400,7 +411,7 @@ function drawSplash() {
   [[62, 99, 0], [40, 101, 1]].forEach(([dx, dyy, i]) => { const bob = Math.floor(T * 2 + i) % 2, x = dx + Math.round(Math.sin(T * 0.7 + i * 2) * 4), y = gy + dyy + bob;
     R(x, y, 6, 3, '#fff'); R(x + 4, y - 2, 3, 3, '#fff'); R(x + 7, y - 1, 2, 1, '#ffb02e'); R(x + 5, y - 1, 1, 1, K); });
   if (Math.floor(T * 2) % 2 === 0 || overlayT < 0.5) Font.bigCentered(ctx, 'TAP TO START', 97, LH - 28, '#fff', 2, K);
-  if (level > 1) Font.smallCentered(ctx, 'CONTINUE: SHIFT ' + level, 97, LH - 10, '#fff', 1, K);
+  if (level > 1) Font.smallCentered(ctx, 'CONTINUE: SHIFT ' + level + (career ? '   CAREER ' + fmt(career) : ''), 97, LH - 10, '#fff', 1, K);
 }
 
 // ---------- play rendering ----------
@@ -431,7 +442,8 @@ function drawPlay() {
     const bx = bayX(i), locked = i >= G.open, bb = G.bays[i];
     R(bx, BAY_Y, BAY_W, BAY_H, locked ? '#3d4450' : '#5d6776');
     if (locked) { for (let k = 0; k < BAY_H; k += 4) { R(bx, BAY_Y + k, 1, 2, '#6b7584'); R(bx + BAY_W - 1, BAY_Y + k, 1, 2, '#6b7584'); }
-      if (!G.bonusUsed) { const pulse = Math.floor(T * 3) % 2; R(bx + 11, BAY_Y + 14, 4, 10, pulse ? '#4ade80' : '#22c55e'); R(bx + 8, BAY_Y + 17, 10, 4, pulse ? '#4ade80' : '#22c55e'); }
+      const pulse = i === G.open && Math.floor(T * 3) % 2; R(bx + 11, BAY_Y + 10, 4, 10, pulse ? '#4ade80' : '#22c55e'); R(bx + 8, BAY_Y + 13, 10, 4, pulse ? '#4ade80' : '#22c55e');
+      Font.smallCentered(ctx, '-' + UNLOCK_COST, bayCx(i), BAY_Y + 26, '#ff8a8f');
       continue; }
     for (let k = 0; k < BAY_H; k++) { R(bx, BAY_Y + k, 1, 1, '#e6e9ee'); R(bx + BAY_W - 1, BAY_Y + k, 1, 1, '#e6e9ee'); }
     if (bb.state === 'parked' || bb.state === 'full') {
@@ -473,6 +485,7 @@ function drawPlay() {
     v.dir = dir; drawVehicle(v, px, py, { siren: flash, noShadow: true });
     if (dir === 0 && t > 0.7) for (let k = 1; k < 4; k++) R(Math.round(px - v.len / 2 - k * 5 - (t * 40) % 4), Math.round(py) - 3 + k * 2, 3, 1, 'rgba(255,255,255,.7)'); });
   for (const p of G.pops) { ctx.globalAlpha = p.t < 0.7 ? 1 : Math.max(0, 1 - (p.t - 0.7) / 0.2); blit(Sprites.icon(p.dept), p.x, p.y); ctx.globalAlpha = 1; }
+  for (const f of G.floats) { ctx.globalAlpha = f.t < 1 ? 1 : Math.max(0, 1 - (f.t - 1) / 0.4); Font.bigCentered(ctx, f.text, Math.round(f.x), Math.round(f.y), f.col, 1, K); ctx.globalAlpha = 1; }
   drawHud();
   if (toast && toast.t > 0) { const w = Font.smallWidth(toast.msg) + 10; badge(Math.round(97 - w / 2), BAY_Y + BAY_H + 10, w, 11, '#334155'); Font.small(ctx, toast.msg, Math.round(97 - w / 2) + 5, BAY_Y + BAY_H + 13, '#fff'); }
 }
@@ -485,11 +498,12 @@ function slash(x, y) { for (let i = 0; i < 9; i++) R(x + i, y + i, 1, 1, '#e8424
 function addButton(x, y, w, h, fn) { buttons.push({ x, y, w, h, fn }); }
 function drawHud() {
   Font.small(ctx, 'SHIFT ' + G.n, 4, 4, '#334155');
+  Font.bigCentered(ctx, fmt(G.shown), 97, 3, G.shown < 0 ? '#ff8a8f' : '#fff', 1, K);
   const x0 = LW - 36;
   iconMusic(x0, 2, Sound.music); addButton(x0 - 3, 0, 13, 16, () => { Sound.toggleMusic(); if (Sound.music) Sound.play('play'); });
   iconSpeaker(x0 + 12, 2, Sound.effects); addButton(x0 + 9, 0, 13, 16, () => Sound.toggleSfx());
   iconRestart(x0 + 24, 2); addButton(x0 + 21, 0, 15, 16, () => { Sound.sfx.click(); startLevel(level); screen = 'card'; overlayT = 0; });
-  if (!G.bonusUsed) addButton(bayX(SLOTS - 1), BAY_Y, BAY_W, BAY_H, useBonus);
+  for (let i = G.open; i < SLOTS; i++) addButton(bayX(i), BAY_Y, BAY_W, BAY_H, unlockBay);
 }
 function panel(x, y, w, h, head) {
   R(x + 2, y + 3, w, h, 'rgba(20,24,36,.35)');
@@ -527,17 +541,22 @@ function ecg(x, y, w, t) {
 }
 function drawEnd(won) {
   drawPlay(); buttons = []; dim();
-  const w = 170, x = Math.round(97 - w / 2), h = won ? 104 : (G.over === 'jam' && !G.bonusUsed ? 112 : 92), y = Math.round(LH / 2 - h / 2) - 20;
+  const canOpen = G.over === 'jam' && G.open < SLOTS;
+  const w = 170, x = Math.round(97 - w / 2), h = won ? 142 : (canOpen ? 112 : 92), y = Math.round(LH / 2 - h / 2) - 20;
   panel(x, y, w, h, won ? '#22a35a' : '#c0392b');
   Font.bigCentered(ctx, won ? 'DISCHARGED!' : (G.over === 'code' ? 'CODE BLUE!' : 'GRIDLOCK!'), 97, y + 5, '#fff', 1);
   R(x + 8, y + 22, w - 16, 26, '#14202e');
   if (won) ecg(x + 8, y + 38, w - 16, overlayT); else { R(x + 8, y + 35, w - 16, 1, '#3ddc84'); }
   Font.smallCentered(ctx, won ? '(' + G.endLine + ')' : G.endLine, 97, y + 54, '#475569');
-  if (won) { button('NEXT SHIFT', 97, y + h - 40, 96, '#22a35a', () => { Sound.sfx.click(); startLevel(level + 1); screen = 'card'; overlayT = 0; Sound.play('title'); });
+  if (won) {
+    Font.bigCentered(ctx, fmt(G.shown), 97, y + 64, '#22a35a', 2, K);
+    Font.smallCentered(ctx, 'SHIFT CLEAR +1,000' + (G.bonus ? '   LOCKED BAYS +' + fmt(G.bonus) : ''), 97, y + 83, '#475569');
+    Font.smallCentered(ctx, 'CAREER TOTAL ' + fmt(career), 97, y + 91, '#94a3b8');
+    button('NEXT SHIFT', 97, y + h - 40, 96, '#22a35a', () => { Sound.sfx.click(); startLevel(level + 1); screen = 'card'; overlayT = 0; Sound.play('title'); });
     button('REPLAY', 97, y + h - 20, 96, '#64748b', () => { Sound.sfx.click(); startLevel(level); screen = 'card'; overlayT = 0; }); }
-  else { let by = y + h - (G.over === 'jam' && !G.bonusUsed ? 40 : 20);
-    if (G.over === 'jam' && !G.bonusUsed) { button('USE SPARE BAY', 97, by, 110, '#22a35a', () => { G.over = null; useBonus(); screen = 'play'; }); by += 20; }
-    button('TRY AGAIN', 97, by, 110, '#c0392b', () => { Sound.sfx.click(); startLevel(level); screen = 'card'; overlayT = 0; }); }
+  else { let by = y + h - (canOpen ? 40 : 20);
+    if (canOpen) { button('OPEN A BAY -' + UNLOCK_COST, 97, by, 130, '#22a35a', () => { G.over = null; unlockBay(); screen = 'play'; }); by += 20; }
+    button('TRY AGAIN', 97, by, 130, '#c0392b', () => { Sound.sfx.click(); startLevel(level); screen = 'card'; overlayT = 0; }); }
 }
 
 // ---------- input ----------
