@@ -33,6 +33,14 @@ const BAY_Y = 148, BAY_W = 26, BAY_H = 38, LOT_TOP = 194, SLOTS = 6, OPEN = 4, U
 const bayX = i => 10 + i * 30, bayCx = i => bayX(i) + 13, bayCy = () => BAY_Y + 19;
 const LOT = { cx: 97, cy: Math.round((LOT_TOP + LH - 4) / 2), rx: 92, ry: Math.round((LH - 4 - LOT_TOP) / 2) - 2 };
 const DOOR = { x: LOOP.cx, y: LOOP.cy + LOOP.ry + 8 };
+// park decor around the walkway; everything sits in the gaps the paths leave free
+const PARK = {
+  pond: { x: 22, y: 126, rx: 18, ry: 8 },
+  trees: [[8, 107, 0.8, 0], [184, 114, 1, 1.7], [44, 31, 0.65, 3.1], [150, 31, 0.65, 4.4]],
+  bench: { x: 146, y: 134 },
+};
+const SIGN = (() => { const w = Font.smallWidth(SIGN_SHORT) + 14; return { x: Math.round(LOOP.cx - w / 2), y: LOOP.cy - 12, w }; })();
+const inPond = (x, y) => ((x - PARK.pond.x) / (PARK.pond.rx + 2)) ** 2 + ((y - PARK.pond.y) / (PARK.pond.ry + 2)) ** 2 <= 1;
 
 function makePath(pts, closed) { const P = pts.slice(); if (closed) P.push(pts[0]);
   const cum = [0]; for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
@@ -76,7 +84,7 @@ const BLURBS = [
 const WIN_LINES = ["They'll be back.", 'Beds are clean. For eleven minutes.', 'Handover done. Not your problem anymore.', "Everyone's where they belong. Suspicious."];
 const LOSE_LINES = ['Somebody page the charge nurse.', "Time for a coffee you won't finish.", 'Code Brown in the parking lot.'];
 const INTROS = {
-  1: 'Tap an ambulance to drive it out. Patients board the ambulance for their department. Full ones leave. Clear the lot! Locked bays open for 500 points each.',
+  1: 'Tap an ambulance to drive it out. Patients board the ambulance for their department. Full ones leave. Clear the lot! Locked bays open for 500 points each. Tap the sign to see who's who.',
   3: 'New: triage pending. Grey ambulances hide their department until the road ahead is clear.',
   5: 'New: flip-floppers. Ambulances with the yellow arrows turn around every time you send another one off.',
   7: 'New: code blue! The crash cart has to leave before its counter hits zero. Every move counts.',
@@ -119,15 +127,16 @@ function tapVehicle(v) {
     const a = v.dir * Math.PI / 4, c = Math.cos(a), s = Math.sin(a); let d = 0, hit = null;
     for (; d < 300 && !hit; d += 1) { const box = vBox(v, -0.1, c * d, s * d); for (const o of lot) if (o !== v && sat(box, vBox(o, -0.1))) { hit = o; break; } }
     v.bumpDist = Math.max(0, d - 2); v.bumpT = 0.001; if (hit) hit.shake = 0.3;
-    Sound.sfx.honk(); buzz(25); return;
+    Sound.sfx.honk(); buzz(25); shakeScreen(0.12, 1); return;
   }
-  if (v.kind === 'cart') { v.state = 'exit'; v.away = true; v.dist = 0; Sound.sfx.siren(); afterMove(v); return; }
+  if (v.kind === 'cart') { v.state = 'exit'; v.away = true; v.dist = 0; Sound.sfx.siren(); rearPuff(v, 5); afterMove(v); return; }
   let slot = -1; for (let i = 0; i < G.open; i++) if (G.bays[i].state === 'empty') { slot = i; break; }
-  if (slot < 0) { v.shake = 0.3; flash('NO FREE BAYS!'); Sound.sfx.nope(); buzz(40); return; }
+  if (slot < 0) { v.shake = 0.3; flash('NO FREE BAYS!'); Sound.sfx.nope(); buzz(40); shakeScreen(0.2, 1); return; }
   G.bays[slot] = { state: 'reserved', v, seats: 0, filled: 0, t: 0 };
-  v.bay = slot; v.state = 'exit'; v.dist = 0; v.revealed = true; Sound.sfx.tap();
+  v.bay = slot; v.state = 'exit'; v.dist = 0; v.revealed = true; Sound.sfx.tap(); rearPuff(v, 5);
   afterMove(v);
 }
+function rearPuff(v, n) { const a = v.dir * Math.PI / 4; puff((v.px ?? v.x) - Math.cos(a) * v.len / 2, (v.py ?? v.y) - Math.sin(a) * v.len / 2 + 2, n); }
 function afterMove(moved) {
   G.moves++;
   for (const v of onLot()) {
@@ -142,16 +151,43 @@ function addScore(pts, x, y, big) { G.score += pts; if (big) G.floats.push({ tex
 function unlockBay() {
   if (G.open >= SLOTS) return;
   G.open++; addScore(-UNLOCK_COST, bayCx(G.open - 1), BAY_Y + 10, true);
-  flash('BAY OPENED  -' + UNLOCK_COST); Sound.sfx.bonus();
+  flash('BAY OPENED  -' + UNLOCK_COST); Sound.sfx.bonus(); sparkle(bayCx(G.open - 1), bayCy(), 24, ['#4ade80', '#ffe066', '#ffffff']);
 }
 function buzz(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
 function flash(msg) { toast = { msg, t: 1.6 }; }
+// ---------- particles + screen effects ----------
+let fx = [], confetti = [], taps = [], shakeT = 0, shakeAmp = 0;
+function shakeScreen(t, amp) { shakeT = Math.max(shakeT, t); shakeAmp = amp; }
+function puff(x, y, n, col = '#f1f3f6') { for (let i = 0; i < n; i++) fx.push({ kind: 'dust', x: x + (Math.random() - 0.5) * 6, y: y + (Math.random() - 0.5) * 3, vx: (Math.random() - 0.5) * 16, vy: -Math.random() * 8, t: 0, life: 0.35 + Math.random() * 0.25, col }); }
+function sparkle(x, y, n, col) { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, sp = 20 + Math.random() * 30;
+  fx.push({ kind: 'spark', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 15, t: 0, life: 0.5 + Math.random() * 0.3, col: Array.isArray(col) ? pick(col) : col }); } }
+const CONFETTI = ['#ff4d4d', '#ffe066', '#4ade80', '#3a86ff', '#ff7eb6', '#c9a2f5', '#ffffff'];
+function dropConfetti(n, top) { for (let i = 0; i < n; i++) confetti.push({ x: Math.random() * LW, y: top ? -Math.random() * 60 : -4, vy: 26 + Math.random() * 26, ph: Math.random() * 6, col: pick(CONFETTI), t: 0 }); }
+function updateFx(dt) {
+  if (shakeT > 0) shakeT = Math.max(0, shakeT - dt);
+  for (const f of fx) { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; if (f.kind === 'spark') f.vy += 60 * dt; else { f.vx *= 0.9; f.vy *= 0.9; } }
+  fx = fx.filter(f => f.t < f.life);
+  for (const c of confetti) { c.t += dt; c.y += c.vy * dt; c.x += Math.sin(c.t * 4 + c.ph) * 14 * dt; }
+  confetti = confetti.filter(c => c.y < LH + 4);
+  if (screen === 'win' && overlayT < 3.5 && Math.random() < dt * 25) dropConfetti(1);
+  for (const r of taps) r.t += dt; taps = taps.filter(r => r.t < 0.3);
+}
+function drawFx() {
+  for (const f of fx) { const u = f.t / f.life;
+    if (f.kind === 'dust') { ctx.globalAlpha = 0.75 * (1 - u); disc(Math.round(f.x), Math.round(f.y), Math.round(1 + u * 2.5), f.col); }
+    else { ctx.globalAlpha = 1 - u * u; R(Math.round(f.x), Math.round(f.y), 1, 1, f.col); if (u < 0.4) { R(Math.round(f.x) - 1, Math.round(f.y), 3, 1, f.col); R(Math.round(f.x), Math.round(f.y) - 1, 1, 3, f.col); } } }
+  ctx.globalAlpha = 1;
+  for (const r of taps) { const rad = 2 + r.t * 30; ctx.globalAlpha = 1 - r.t / 0.3;
+    for (let k = 0; k < 20; k++) { const a = k / 20 * Math.PI * 2; R(Math.round(r.x + Math.cos(a) * rad), Math.round(r.y + Math.sin(a) * rad), 1, 1, '#ffffff'); } }
+  ctx.globalAlpha = 1;
+}
+function drawConfetti() { for (const c of confetti) { const flat = Math.floor(c.t * 8 + c.ph) % 2; R(Math.round(c.x), Math.round(c.y), flat ? 2 : 1, flat ? 1 : 2, c.col); } }
 function win() {
   const locked = SLOTS - G.open; G.bonus = locked * UNLOCK_COST; G.score += 1000 + G.bonus;
   career += G.score; try { localStorage.setItem('aj.total', career); } catch (e) {}
-  G.over = 'win'; G.endLine = pick(WIN_LINES); overlayT = 0; Sound.sfx.win(); setTimeout(() => { if (screen === 'play') screen = 'win'; }, 500); }
+  G.over = 'win'; G.endLine = pick(WIN_LINES); overlayT = 0; Sound.sfx.win(); dropConfetti(90, true); setTimeout(() => { if (screen === 'play') screen = 'win'; }, 500); }
 function lose(why) { G.over = why; G.endLine = why === 'code' ? 'The crash cart got boxed in.' : pick(LOSE_LINES); overlayT = 0;
-  if (why === 'code') Sound.sfx.flatline(); else Sound.sfx.lose(); setTimeout(() => { if (screen === 'play') screen = 'lose'; }, 400); }
+  shakeScreen(0.35, 2); if (why === 'code') Sound.sfx.flatline(); else Sound.sfx.lose(); setTimeout(() => { if (screen === 'play') screen = 'lose'; }, 400); }
 
 // ---------- update ----------
 const insideLot = (x, y) => G.cfg.shape((x - LOT.cx) / LOT.rx, (y - LOT.cy) / LOT.ry);
@@ -159,8 +195,10 @@ function update(dt) {
   T += dt; if (toast) toast.t -= dt; overlayT += dt;
   if (G) { G.shown += (G.score - G.shown) * Math.min(1, dt * 6); if (Math.abs(G.score - G.shown) < 1) G.shown = G.score;
     G.floats.forEach(f => { f.t += dt; f.y -= 14 * dt; }); G.floats = G.floats.filter(f => f.t < 1.4); }
+  updateFx(dt);
   if (!G || screen !== 'play') return;
   for (const v of G.vehicles) {
+    if ((v.state === 'exit' || v.state === 'route') && (v.puffT = (v.puffT || 0) - dt) <= 0) { v.puffT = 0.05; rearPuff(v, 1); }
     if (v.shake > 0) v.shake = Math.max(0, v.shake - dt);
     if (v.flipAnim > 0) v.flipAnim = Math.max(0, v.flipAnim - dt * 4);
     if (v.state === 'lot' && v.bumpT > 0) { v.bumpT += dt / 0.3; if (v.bumpT >= 1) v.bumpT = 0; }
@@ -176,7 +214,7 @@ function update(dt) {
       const wp = v.route[0], dx = wp.x - v.px, dy = wp.y - v.py, d = Math.hypot(dx, dy), step = 260 * dt;
       if (d > 0.5) v.dir = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
       if (d <= step) { v.px = wp.x; v.py = wp.y; v.route.shift();
-        if (!v.route.length) { v.state = 'parked'; v.dir = 6; const b = G.bays[v.bay]; b.state = 'parked'; b.seats = v.cap; b.filled = 0; b.t = 0; b.parkedAt = T; Sound.sfx.park(); } }
+        if (!v.route.length) { v.state = 'parked'; v.dir = 6; const b = G.bays[v.bay]; b.state = 'parked'; b.seats = v.cap; b.filled = 0; b.t = 0; b.parkedAt = T; b.land = T; Sound.sfx.park(); puff(v.px, v.py + v.len / 2, 6); } }
       else { v.px += dx / d * step; v.py += dy / d * step; }
     }
   }
@@ -211,7 +249,7 @@ function update(dt) {
     if (fl.t >= 1 && !fl.done) {
       fl.done = true; const bb = G.bays[fl.bay]; bb.filled++; addScore(10);
       Sound.sfx.board(Math.floor(bb.filled / bb.v.cap * 9)); G.pops.push({ dept: fl.dept, x: bayCx(fl.bay) + (Math.random() - 0.5) * 8, y: BAY_Y + 6, t: 0, vx: (Math.random() - 0.5) * 16 });
-      if (bb.filled >= bb.v.cap) { bb.state = 'full'; bb.t = 0; }
+      if (bb.filled >= bb.v.cap) { bb.state = 'full'; bb.t = 0; bb.stamp = T; sparkle(bayCx(fl.bay), BAY_Y + 14, 18, [bb.v.dept.T, bb.v.dept.L, '#ffffff']); }
     }
   }
   G.flyers = G.flyers.filter(f => !f.done);
@@ -219,7 +257,8 @@ function update(dt) {
   G.bays.forEach(bb => {
     bb.t += dt;
     if (bb.state === 'full' && bb.t > 0.35) { bb.state = 'leaving'; bb.t = 0; Sound.sfx.siren(); addScore(bb.v.cap * 5, bayCx(G.bays.indexOf(bb)), BAY_Y + 6, true); }
-    else if (bb.state === 'leaving' && bb.t > 1.6) { bb.v.state = 'gone'; Object.assign(bb, { state: 'empty', v: null, t: 0 }); }
+    else if (bb.state === 'leaving' && bb.t > 0.6 && !bb.zoom) { bb.zoom = true; const k = G.bays.indexOf(bb); puff(bayCx(k) - 8, bayCy() + 32, 8); }
+    else if (bb.state === 'leaving' && bb.t > 1.6) { bb.v.state = 'gone'; Object.assign(bb, { state: 'empty', v: null, t: 0, zoom: false }); }
   });
   if (G.over) return;
   // win / lose
@@ -241,21 +280,60 @@ function makeLayer() { const c = document.createElement('canvas'); c.width = LW;
 const playBg = makeLayer();
 function buildPlayBg() {
   const b = playBg.getContext('2d'); srand = 11;
-  for (let ty = 0; ty < LOT_TOP; ty += 8) for (let tx = 0; tx < LW; tx += 8) R(tx, ty, 8, 8, ((tx + ty) / 8) % 2 ? '#e9edf0' : '#dde3e8', b);
+  // mown grass with diagonal stripes, tufts and the odd daisy
+  R(0, 0, LW, LOT_TOP, '#8fca76', b);
+  for (let y = 0; y < LOT_TOP; y++) for (let x0 = -LOT_TOP; x0 < LW; x0 += 24) R(x0 + Math.floor(y / 2), y, 12, 1, '#97d07e', b);
+  for (let i = 0; i < 260; i++) R(Math.floor(prand() * LW), 13 + Math.floor(prand() * (LOT_TOP - 13)), 1, 2, prand() < 0.6 ? '#7dba64' : '#a8dc90', b);
+  for (let i = 0; i < 40; i++) R(Math.floor(prand() * LW), 13 + Math.floor(prand() * (BAY_Y - 20)), 1, 1, ['#ffffff', '#ffe066', '#ff9fb0'][i % 3], b);
+  // stone paths
   const band = (path, w, col) => { b.strokeStyle = col; b.lineWidth = w; b.lineJoin = 'round'; b.lineCap = 'round'; b.beginPath();
     path.P.forEach((p, i) => i ? b.lineTo(p[0], p[1]) : b.moveTo(p[0], p[1])); if (path.closed) b.closePath(); b.stroke(); };
-  for (const p of FUNNEL_PATHS) band(p, 34, '#aab5c1'); band(loopPath, 34, '#aab5c1');
-  R(LOOP.cx - 9, LOOP.cy + LOOP.ry, 18, BAY_Y - LOOP.cy - LOOP.ry - 2, '#aab5c1', b);
-  for (const p of FUNNEL_PATHS) band(p, 30, '#c3ccd6'); band(loopPath, 30, '#c3ccd6');
-  R(LOOP.cx - 7, LOOP.cy + LOOP.ry, 14, BAY_Y - LOOP.cy - LOOP.ry - 2, '#c3ccd6', b);
-  // lawn + signpost
+  const PATH = '#e8dcc0', EDGE = '#b9a37e';
+  for (const p of FUNNEL_PATHS) band(p, 34, EDGE); band(loopPath, 34, EDGE);
+  R(LOOP.cx - 9, LOOP.cy + LOOP.ry, 18, BAY_Y - LOOP.cy - LOOP.ry - 2, EDGE, b);
+  for (const p of FUNNEL_PATHS) band(p, 30, PATH); band(loopPath, 30, PATH);
+  R(LOOP.cx - 7, LOOP.cy + LOOP.ry, 14, BAY_Y - LOOP.cy - LOOP.ry - 2, PATH, b);
+  { // speckle the paving (only where the path is)
+    const img = b.getImageData(0, 0, LW, LOT_TOP), d = img.data;
+    for (let i = 0; i < 900; i++) { const x = Math.floor(prand() * LW), y = 13 + Math.floor(prand() * (LOT_TOP - 13)), k = (y * LW + x) * 4;
+      if (d[k] === 0xe8 && d[k + 1] === 0xdc && d[k + 2] === 0xc0) R(x, y, prand() < 0.5 ? 2 : 1, 1, prand() < 0.7 ? '#dccdab' : '#f3ead6', b); }
+  }
+  // lawn island + flower bed + signpost
   ellipse(LOOP.cx, LOOP.cy, LOOP.rx - 17, LOOP.ry - 17, '#9fd18b', b);
   for (let i = 0; i < 30; i++) { const a = prand() * 6.28, rr = Math.sqrt(prand()); R(Math.round(LOOP.cx + Math.cos(a) * (LOOP.rx - 20) * rr), Math.round(LOOP.cy + Math.sin(a) * (LOOP.ry - 20) * rr), 1, 2, '#7fb86c', b); }
+  const bush = (x, y, r) => { ellipse(x, y + r - 1, r + 1, 2, 'rgba(40,80,40,.3)', b); disc(x, y, r, '#3f8f43', b); disc(x - 1, y - 1, r - 2, '#5bb35a', b);
+    R(x + 1, y - 2, 1, 1, '#ff9fb0', b); R(x - 2, y + 1, 1, 1, '#ffe066', b); };
+  bush(68, 86, 4); bush(126, 86, 4);
+  ellipse(LOOP.cx, 91, 13, 3, '#8a5a3a', b); ellipse(LOOP.cx, 90, 12, 2, '#9b6a45', b);
+  for (let i = 0; i < 16; i++) R(LOOP.cx - 11 + Math.floor(prand() * 22), 89 + Math.floor(prand() * 3), 1, 1, ['#ff4d4d', '#ffe066', '#ff9fb0', '#c9a2f5'][i % 4], b);
   const w = Font.smallWidth(SIGN_SHORT) + 14, sx = Math.round(LOOP.cx - w / 2), sy = LOOP.cy - 12;
   R(LOOP.cx - 1, sy + 10, 3, 13, '#6e4321', b); R(LOOP.cx + 1, sy + 10, 1, 13, '#4a2f22', b);
   R(sx - 1, sy - 1, w + 2, 13, K, b); R(sx, sy, w, 11, '#1f4e9c', b); R(sx, sy, w, 1, '#2f66c4', b);
   R(sx + 2, sy + 2, 7, 7, '#fff', b); R(sx + 5, sy + 3, 1, 5, '#e8424f', b); R(sx + 3, sy + 5, 5, 1, '#e8424f', b);
   Font.small(b, SIGN_SHORT, sx + 11, sy + 3, '#fff');
+  // hedge along the top wall
+  R(54, 15, 86, 6, '#3f8f43', b); for (let x = 56; x < 140; x += 7) { disc(x, 15, 3, '#3f8f43', b); disc(x - 1, 14, 1, '#5bb35a', b); }
+  for (let x = 58; x < 138; x += 11) R(x, 17, 1, 1, '#ff9fb0', b);
+  R(54, 21, 86, 1, '#2f6e34', b);
+  // tree trunks and shadows (the canopies sway, so they're drawn live)
+  for (const [tx, ty, s] of PARK.trees) { ellipse(tx + 1, ty + Math.round(10 * s) - 1, Math.round(9 * s), 2, 'rgba(40,80,40,.35)', b);
+    R(tx - 2, ty - 2, 4, Math.round(12 * s), '#7a4a2a', b); R(tx, ty - 2, 2, Math.round(12 * s), '#5c3620', b); }
+  // duck pond
+  const P = PARK.pond;
+  ellipse(P.x, P.y + 1, P.rx + 2, P.ry + 2, '#9a958b', b); ellipse(P.x, P.y, P.rx + 2, P.ry + 2, '#c9c4b8', b);
+  ellipse(P.x, P.y, P.rx + 1, P.ry + 1, '#4d93cc', b); ellipse(P.x, P.y + 1, P.rx, P.ry, '#7cc0ee', b); ellipse(P.x + 1, P.y + 2, P.rx - 6, P.ry - 4, '#6ab4e6', b);
+  for (let i = 0; i < 26; i++) { const a = i / 26 * Math.PI * 2; R(Math.round(P.x + Math.cos(a) * (P.rx + 2)) - 1, Math.round(P.y + Math.sin(a) * (P.ry + 2)), 2, 1, i % 3 ? '#b3ad9f' : '#dcd7cb', b); }
+  const pad = (x, y) => { ellipse(x, y, 3, 1, '#3f9d4a', b); R(x - 1, y - 1, 3, 1, '#5bb35a', b); R(x + 2, y, 1, 1, '#6ab4e6', b); };
+  pad(P.x - 11, P.y + 2); pad(P.x + 10, P.y + 4); R(P.x + 9, P.y + 2, 2, 1, '#ff9fb0', b); R(P.x + 9, P.y + 1, 1, 1, '#ffc4cf', b);
+  for (const [x, h] of [[P.x - P.rx + 1, 9], [P.x - P.rx + 3, 7], [P.x - P.rx + 5, 10]]) { R(x, P.y - 4 - h, 1, h, '#4f8f3a', b); R(x, P.y - 4 - h, 1, 3, '#7a4a2a', b); }
+  // plastic flamingo, bench, lamp, flower beds
+  { const fx0 = 46, fy = 135; R(fx0, fy - 7, 1, 7, '#c2577a', b); R(fx0 + 2, fy - 7, 1, 7, '#c2577a', b); ellipse(fx0 + 1, fy - 9, 3, 2, '#ff8fb1', b); R(fx0 - 2, fy - 10, 2, 1, '#ff6f9a', b);
+    R(fx0 + 3, fy - 15, 1, 6, '#ff8fb1', b); R(fx0 + 3, fy - 16, 2, 2, '#ff8fb1', b); R(fx0 + 5, fy - 15, 1, 2, K, b); R(fx0 + 4, fy - 16, 1, 1, K, b); }
+  const bed = (x, y, w) => { R(x, y, w, 4, '#8a5a3a', b); R(x, y, w, 1, '#9b6a45', b); for (let i = 1; i < w - 1; i += 2) R(x + i, y - (i % 4 ? 1 : 0), 1, 2, ['#ff4d4d', '#ffe066', '#ff9fb0', '#c9a2f5', '#ffffff'][i % 5], b); };
+  bed(54, 137, 30); bed(110, 138, 26);
+  const { x: BX, y: BY } = PARK.bench;
+  R(BX, BY, 18, 3, '#a0673a', b); R(BX, BY - 4, 18, 2, '#c0874a', b); R(BX + 1, BY + 3, 2, 4, K, b); R(BX + 15, BY + 3, 2, 4, K, b); R(BX, BY + 3, 18, 1, '#6e4321', b);
+  R(171, 118, 2, 18, '#4a5160', b); R(168, 116, 8, 3, '#4a5160', b); R(169, 119, 6, 1, '#ffe27a', b); ellipse(172, 136, 4, 1, 'rgba(40,80,40,.35)', b);
   // top wall for the HUD
   R(0, 0, LW, 12, '#b8c4d0', b); R(0, 12, LW, 1, '#8e9cab', b);
   // bay strip
@@ -263,6 +341,49 @@ function buildPlayBg() {
   // lot
   R(0, LOT_TOP - 4, LW, LH - LOT_TOP + 4, '#8a94a3', b);
   for (let i = 0; i < 700; i++) R(Math.floor(prand() * LW), LOT_TOP + Math.floor(prand() * (LH - LOT_TOP)), 1, 1, prand() < 0.5 ? '#828c9b' : '#929cab', b);
+}
+// cloud shadow stamp, drawn translucent over the park
+const cloudShadow = (() => { const c = document.createElement('canvas'); c.width = 60; c.height = 22; const g = c.getContext('2d');
+  ellipse(18, 12, 16, 8, '#1d3b26', g); ellipse(34, 9, 16, 8, '#1d3b26', g); ellipse(44, 13, 13, 7, '#1d3b26', g); return c; })();
+// live park: pond shimmer, ducks, swaying trees, bench sitter
+let duckHop = -9;
+function drawDuck(x, y, f, baby, dabble) {
+  const M = (dx, dy, w, h, col) => R(f > 0 ? x + dx : x - dx - w + 1, y + dy, w, h, col);
+  if (baby) { M(0, 0, 3, 2, '#ffe066'); M(2, -2, 2, 2, '#ffe066'); M(4, -1, 1, 1, '#ff9a1f'); M(3, -2, 1, 1, K); M(-1, 2, 5, 1, '#b9e1fb'); return; }
+  if (dabble) { M(1, 1, 5, 2, '#fff'); M(2, -1, 2, 2, '#fff'); M(2, -2, 1, 1, '#e3e9ef'); M(1, 3, 6, 1, '#b9e1fb'); return; }
+  M(0, 0, 6, 3, '#fff'); M(1, 1, 3, 1, '#e3e9ef'); M(-1, -1, 1, 1, '#fff'); M(4, -3, 3, 3, '#fff'); M(5, -2, 1, 1, K); M(7, -2, 2, 1, '#ff9a1f'); M(-1, 3, 8, 1, '#b9e1fb');
+}
+function drawPark() {
+  const P = PARK.pond;
+  for (let i = 0; i < 5; i++) { if ((Math.floor(T * 1.5) + i) % 4 === 0) continue;
+    const x = Math.round(P.x - 13 + ((i * 7 + T * 2.5) % 24)), y = P.y - 3 + (i * 3) % 8; R(x, y, 2 + (i % 2), 1, '#b9e1fb'); }
+  // mum and ducklings paddle round the pond
+  const hop = Math.max(0, 1 - (T - duckHop) / 0.35);
+  [0, 0.55, 0.95].forEach((lag, i) => {
+    const a = T * 0.35 - lag, x = Math.round(P.x + Math.cos(a) * 10), f = -Math.sin(a) > 0 ? 1 : -1;
+    const y = Math.round(P.y + 1 + Math.sin(a) * 3.5) + (Math.floor(T * 2 + i) % 2) - (i === 0 ? Math.round(Math.sin(hop * Math.PI) * 4) : 0);
+    if (i === 0) { const u = (T * 0.7) % 1.6; if (u < 1) { ctx.globalAlpha = 1 - u;
+      for (let k = 0; k < 16; k++) { const b2 = k / 16 * Math.PI * 2; R(Math.round(x + 2 + Math.cos(b2) * (4 + u * 5)), Math.round(y + 2 + Math.sin(b2) * (1 + u * 2)), 1, 1, '#d6efff'); } ctx.globalAlpha = 1; } }
+    drawDuck(x, y, f, i > 0, i === 0 && T % 9 < 1.4 && hop === 0);
+  });
+  // tree canopies sway a pixel in the breeze
+  for (const [tx, ty, s, ph] of PARK.trees) { const sw = Math.round(Math.sin(T * 1.3 + ph) * 0.8);
+    disc(tx, Math.round(ty - 12 * s), Math.round(10 * s), '#2f7a3a');
+    disc(Math.round(tx - 4 * s) + sw, Math.round(ty - 15 * s), Math.round(7 * s), '#3f9d4a'); disc(Math.round(tx + 5 * s) + sw, Math.round(ty - 10 * s), Math.round(6 * s), '#3f9d4a');
+    disc(Math.round(tx - 5 * s) + sw, Math.round(ty - 17 * s), Math.round(3 * s), '#6cc56f'); R(Math.round(tx + 3 * s) + sw, Math.round(ty - 13 * s), 1, 1, '#ff6b6b'); }
+  // someone on the bench, seeing stars
+  const { x: BX, y: BY } = PARK.bench, img = Sprites.patient(deptByName('Neuro'), 2, Math.floor(T * 6) % 2, false);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, LW, BY + 2); ctx.clip(); ctx.drawImage(img, BX + 2, BY - img.height + 5); ctx.restore();
+}
+function drawParkOverlay() {
+  // cloud shadows drift over everything in the park, then butterflies
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 13, LW, BAY_Y - 17); ctx.clip(); ctx.globalAlpha = 0.09;
+  [[0, 34, 5], [110, 104, 3.5]].forEach(([x0, y, sp]) => ctx.drawImage(cloudShadow, Math.round(((x0 + T * sp) % (LW + 70)) - 65), y));
+  ctx.restore(); ctx.globalAlpha = 1;
+  ['#ff9fb0', '#ffe066', '#c9a2f5'].forEach((col, i) => {
+    const x = Math.round(97 + Math.sin(T * 0.23 + i * 2.1) * 88 + Math.sin(T * 1.7 + i) * 4), y = Math.round(78 + Math.sin(T * 0.31 + i * 3.7) * 56 + Math.sin(T * 2.3 + i) * 3);
+    R(x, y, 1, 2, K); if (Math.floor(T * 10 + i * 3) % 2) { R(x - 2, y - 1, 2, 2, col); R(x + 1, y - 1, 2, 2, col); } else { R(x - 1, y - 1, 1, 2, col); R(x + 1, y - 1, 1, 2, col); }
+  });
 }
 function paintLotOutline(shape) {
   // faint painted boundary of this level's lot shape
@@ -423,7 +544,7 @@ function drawVehicle(v, px, py, opts = {}) {
   if (!opts.noShadow) blit(Sprites.shadow(v.kind, v.len, v.dir), x + 1, y + 2);
   const img = v.kind === 'cart' ? Sprites.cart(v.dir) : Sprites.ambulance(v.revealed ? v.dept : TRIAGE, v.len, v.dir, opts.siren);
   blit(img, x, y);
-  if (opts.siren !== undefined) { ctx.fillStyle = opts.siren ? 'rgba(61,123,255,.28)' : 'rgba(255,77,77,.28)'; ctx.fillRect(x - 10, y - 10, 20, 20); }
+  if (opts.siren !== undefined) { const col = opts.siren ? '#3d7bff' : '#ff4d4d'; ctx.globalAlpha = 0.16; ellipse(x, y, 15, 13, col); ctx.globalAlpha = 0.22; ellipse(x, y, 9, 8, col); ctx.globalAlpha = 1; }
   if (v.state !== 'lot') return;
   if (!v.revealed) { badge(x - 3, y - 3, 7, 7, K); Font.small(ctx, '?', x - 1, y - 2, '#fff'); }
   if (v.flip) { const a = v.dir * Math.PI / 4, bx = Math.round(x - Math.cos(a) * v.len * 0.3) - 3, by = Math.round(y - Math.sin(a) * v.len * 0.3) - 4;
@@ -437,6 +558,9 @@ function drawPeople(list) {
 }
 function drawPlay() {
   ctx.drawImage(playBg, 0, 0);
+  drawPark();
+  // the centre sign glints now and then to hint it can be tapped
+  { const g = (T % 5) / 0.6; if (g < 1) { const x = Math.round(SIGN.x + g * (SIGN.w + 8)) - 4; for (let k = 0; k < 4; k++) if (x + k >= SIGN.x && x + k < SIGN.x + SIGN.w) R(x + k, SIGN.y + 3 - k + 4, 1, 4, 'rgba(255,255,255,.35)'); } }
   // bays
   for (let i = 0; i < SLOTS; i++) {
     const bx = bayX(i), locked = i >= G.open, bb = G.bays[i];
@@ -447,12 +571,15 @@ function drawPlay() {
       continue; }
     for (let k = 0; k < BAY_H; k++) { R(bx, BAY_Y + k, 1, 1, '#e6e9ee'); R(bx + BAY_W - 1, BAY_Y + k, 1, 1, '#e6e9ee'); }
     if (bb.state === 'parked' || bb.state === 'full') {
-      const jig = bb.state === 'full' ? Math.round(Math.sin(bb.t * 70)) : 0;
-      drawVehicle(bb.v, bayCx(i) + jig, bayCy(), { noShadow: true });
+      const jig = bb.state === 'full' ? Math.round(Math.sin(bb.t * 70)) : 0, land = T - (bb.land ?? -9) < 0.3 ? Math.round(Math.sin((T - bb.land) / 0.3 * Math.PI) * 2) : 0;
+      drawVehicle(bb.v, bayCx(i) + jig, bayCy() - land, { noShadow: true });
       if (bb.state === 'parked') { const s = String(bb.v.cap - bb.filled), w = Font.smallWidth(s) + 6;
         R(bayCx(i) - w / 2, BAY_Y + BAY_H - 8, w, 7, bb.v.dept.t); Font.small(ctx, s, bayCx(i) - w / 2 + 3, BAY_Y + BAY_H - 7, '#fff'); }
     }
   }
+  // FULL! stamp drops onto a bay as it fills
+  G.bays.forEach((bb, i) => { const age = T - (bb.stamp ?? -9); if (age > 1.1 || i >= G.open) return;
+    ctx.globalAlpha = age < 0.9 ? 1 : (1.1 - age) / 0.2; Font.bigCentered(ctx, 'FULL!', bayCx(i), bayCy() - 4 - Math.round(Math.max(0, 1 - age * 8) * 10), '#ffe066', 1, K); ctx.globalAlpha = 1; });
   // lot
   const lot = G.vehicles.filter(v => v.state === 'lot').sort((a, b) => a.y - b.y);
   for (const v of lot) { let off = 0; if (v.bumpT > 0) off = v.bumpDist * Math.sin(Math.PI * v.bumpT);
@@ -475,6 +602,7 @@ function drawPlay() {
     let x, y; if (t < 0.45) { const u = t / 0.45; x = lerp(fl.x, DOOR.x, u); y = lerp(fl.y, DOOR.y, u); } else { const u = (t - 0.45) / 0.55; x = lerp(DOOR.x, bx, u); y = lerp(DOOR.y, by, u) - Math.sin(u * Math.PI) * 6; }
     walkers.push({ x, y, dept: fl.dept, left: false, f: Math.floor(T * 10) % 4 }); }
   drawPeople(walkers);
+  drawParkOverlay();
   // moving vehicles on top
   for (const v of G.vehicles) if (v.state === 'exit' || v.state === 'route') drawVehicle(v, v.px, v.py, v.away ? { siren: Math.floor(T * 10) % 2 === 0 } : {});
   G.bays.forEach((bb, i) => { if (bb.state !== 'leaving') return; const t = bb.t, v = bb.v, flash = Math.floor(t * 10) % 2 === 0, ax = bayCx(i), ay = bayCy();
@@ -484,6 +612,7 @@ function drawPlay() {
     else { dir = 0; const u = t - 0.6; py = ay + 32; px = ax + 4 + u * u * 260; }
     v.dir = dir; drawVehicle(v, px, py, { siren: flash, noShadow: true });
     if (dir === 0 && t > 0.7) for (let k = 1; k < 4; k++) R(Math.round(px - v.len / 2 - k * 5 - (t * 40) % 4), Math.round(py) - 3 + k * 2, 3, 1, 'rgba(255,255,255,.7)'); });
+  drawFx();
   for (const p of G.pops) { ctx.globalAlpha = p.t < 0.7 ? 1 : Math.max(0, 1 - (p.t - 0.7) / 0.2); blit(Sprites.icon(p.dept), p.x, p.y); ctx.globalAlpha = 1; }
   for (const f of G.floats) { ctx.globalAlpha = f.t < 1 ? 1 : Math.max(0, 1 - (f.t - 1) / 0.4); Font.bigCentered(ctx, f.text, Math.round(f.x), Math.round(f.y), f.col, 1, K); ctx.globalAlpha = 1; }
   drawHud();
@@ -498,7 +627,8 @@ function slash(x, y) { for (let i = 0; i < 9; i++) R(x + i, y + i, 1, 1, '#e8424
 function addButton(x, y, w, h, fn) { buttons.push({ x, y, w, h, fn }); }
 function drawHud() {
   Font.small(ctx, 'SHIFT ' + G.n, 4, 4, '#334155');
-  Font.bigCentered(ctx, fmt(G.shown), 97, 3, G.shown < 0 ? '#ff8a8f' : '#fff', 1, K);
+  Font.bigCentered(ctx, fmt(G.shown), 97, 3, G.shown < 0 ? '#ff8a8f' : (G.score - G.shown > 0.5 ? '#ffe066' : '#fff'), 1, K);
+  addButton(SIGN.x - 2, SIGN.y - 2, SIGN.w + 4, 28, () => { Sound.sfx.click(); screen = 'legend'; });
   const x0 = LW - 36;
   iconMusic(x0, 2, Sound.music); addButton(x0 - 3, 0, 13, 16, () => { Sound.toggleMusic(); if (Sound.music) Sound.play('play'); });
   iconSpeaker(x0 + 12, 2, Sound.effects); addButton(x0 + 9, 0, 13, 16, () => Sound.toggleSfx());
@@ -515,12 +645,14 @@ function button(label, cx, y, w, col, fn) {
   Font.bigCentered(ctx, label, cx, y + 4, '#fff', 1);
   addButton(x, y, w, 15, fn);
 }
-function dim() { ctx.fillStyle = 'rgba(20,24,36,.45)'; ctx.fillRect(0, 0, LW, LH); }
+function dim() { ctx.fillStyle = 'rgba(20,24,36,' + (0.45 * Math.min(1, overlayT / 0.2)).toFixed(3) + ')'; ctx.fillRect(0, 0, LW, LH); }
+// panels spring up from below when they appear
+const slideIn = () => { const t = Math.min(1, overlayT / 0.4), c1 = 1.70158; return Math.round((1 - (1 + (c1 + 1) * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2))) * 90); };
 function drawCard() {
   drawPlay(); buttons = buttons.filter(b => b.y < 16 && false); dim();
   const w = 170, x = Math.round(97 - w / 2), intro = INTROS[G.n];
   const lines = Font.wrap(G.blurb, w - 16), introLines = intro ? Font.wrap(intro, w - 16) : [];
-  const h = 24 + lines.length * 7 + (introLines.length ? introLines.length * 7 + 8 : 0) + 30, y = Math.round(LH / 2 - h / 2) - 20;
+  const h = 24 + lines.length * 7 + (introLines.length ? introLines.length * 7 + 8 : 0) + 30, y = Math.round(LH / 2 - h / 2) - 20 + slideIn();
   panel(x, y, w, h, '#1f4e9c');
   Font.bigCentered(ctx, 'SHIFT ' + G.n, 97, y + 5, '#fff', 1);
   let yy = y + 24;
@@ -542,7 +674,7 @@ function ecg(x, y, w, t) {
 function drawEnd(won) {
   drawPlay(); buttons = []; dim();
   const canOpen = G.over === 'jam' && G.open < SLOTS;
-  const w = 170, x = Math.round(97 - w / 2), h = won ? 142 : (canOpen ? 112 : 92), y = Math.round(LH / 2 - h / 2) - 20;
+  const w = 170, x = Math.round(97 - w / 2), h = won ? 142 : (canOpen ? 112 : 92), y = Math.round(LH / 2 - h / 2) - 20 + slideIn();
   panel(x, y, w, h, won ? '#22a35a' : '#c0392b');
   Font.bigCentered(ctx, won ? 'DISCHARGED!' : (G.over === 'code' ? 'CODE BLUE!' : 'GRIDLOCK!'), 97, y + 5, '#fff', 1);
   R(x + 8, y + 22, w - 16, 26, '#14202e');
@@ -557,6 +689,37 @@ function drawEnd(won) {
   else { let by = y + h - (canOpen ? 40 : 20);
     if (canOpen) { button('OPEN A BAY -' + UNLOCK_COST, 97, by, 130, '#22a35a', () => { G.over = null; unlockBay(); screen = 'play'; }); by += 20; }
     button('TRY AGAIN', 97, by, 130, '#c0392b', () => { Sound.sfx.click(); startLevel(level); screen = 'card'; overlayT = 0; }); }
+  drawConfetti();
+}
+
+// ---------- patient legend (tap the centre sign) ----------
+const LEGEND = { Cardiac: "Heart's fine. Diet isn't.", Neuro: 'Seeing stars. Literally.', Ortho: 'Trampoline. Age 47.',
+  Peds: 'Swallowed a Lego. Again.', Maternity: 'Due yesterday. Not amused.', Burns: 'Checked if the grill was on.' };
+function drawLegend() {
+  drawPlay(); buttons = []; dim();
+  const w = 180, x = Math.round(97 - w / 2), RH = 26, h = 22 + DEPTS.length * RH + 18 + 24, y = Math.max(4, Math.round(LH / 2 - h / 2) - 10) + slideIn();
+  panel(x, y, w, h, '#1f4e9c');
+  Font.bigCentered(ctx, "WHO'S WHO", 97, y + 5, '#fff', 1);
+  DEPTS.forEach((d, i) => {
+    const ry = y + 20 + i * RH, today = !G || DEPTS.indexOf(d) < G.cfg.depts;
+    if (i) R(x + 6, ry, w - 12, 1, '#eadfca');
+    ctx.globalAlpha = today ? 1 : 0.4;
+    const img = Sprites.patient(d, Math.floor(T * 6 + i) % 4, Math.floor(T * 6 + i) % 2, false), px = x + 16, foot = ry + RH - 2;
+    ellipse(px, foot, 5, 1, 'rgba(0,0,0,.15)');
+    ctx.drawImage(img, px - 7, foot - img.height + 2);
+    Font.big(ctx, d.name, x + 34, ry + 5, d.t, 1);
+    Font.small(ctx, LEGEND[d.name], x + 34, ry + 15, '#64748b');
+    // their icon drifts up off them
+    for (let k = 0; k < 3; k++) { const u = (T * 0.7 + k / 3 + i * 0.17) % 1;
+      ctx.globalAlpha = (today ? 1 : 0.4) * (u < 0.7 ? 1 : (1 - u) / 0.3);
+      blit(Sprites.icon(d), Math.round(px + 7 + Math.sin(u * 6 + k * 2) * 3), Math.round(foot - img.height + 2 - u * 12)); }
+    ctx.globalAlpha = 1;
+  });
+  const fy = y + 22 + DEPTS.length * RH;
+  Font.smallCentered(ctx, "GREY ? AMBULANCES ARE TRIAGE.", 97, fy, '#94a3b8'); Font.smallCentered(ctx, "FREE THEIR ROAD TO SEE WHO THEY'RE FOR.", 97, fy + 7, '#94a3b8');
+  const back = () => { Sound.sfx.click(); screen = 'play'; };
+  button('BACK TO WORK', 97, y + h - 20, 100, '#22a35a', back);
+  addButton(0, 0, LW, LH, back); buttons.unshift(buttons.pop());
 }
 
 // ---------- input ----------
@@ -568,6 +731,8 @@ cv.addEventListener('pointerdown', e => {
   Sound.init();
   for (const b of buttons) if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { b.fn(); return; }
   if (screen !== 'play' || G.over) return;
+  if (p.y < LOT_TOP - 4) taps.push({ x: p.x, y: p.y, t: 0 });
+  if (inPond(p.x, p.y)) { duckHop = T; Sound.sfx.quack(); G.floats.push({ text: 'QUACK!', x: PARK.pond.x + 6, y: PARK.pond.y - 18, t: 0.3, col: '#fff' }); return; }
   let best = null, bd = Infinity;
   for (const v of onLot()) {
     const a = -v.dir * Math.PI / 4, c = Math.cos(a), s = Math.sin(a), lx = (p.x - v.x) * c - (p.y - v.y) * s, ly = (p.x - v.x) * s + (p.y - v.y) * c;
@@ -578,18 +743,23 @@ cv.addEventListener('pointerdown', e => {
 
 // ---------- main loop ----------
 buildPlayBg(); buildSplashBg();
-let lastShape = null;
+let lastShape = null, lastScreen = null;
 let last = performance.now();
 function frame(now) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
   update(dt);
   if (G && G.cfg.shape !== lastShape) { buildPlayBg(); paintLotOutline(G.cfg.shape); lastShape = G.cfg.shape; }
   buttons = [];
+  if (screen !== lastScreen) { lastScreen = screen; overlayT = 0; }
+  const sh = shakeT > 0 ? shakeAmp : 0;
+  ctx.save(); if (sh) { R(0, 0, LW, LH, K); ctx.translate(Math.round((Math.random() - 0.5) * 2 * sh), Math.round((Math.random() - 0.5) * 2 * sh)); }
   if (screen === 'splash') drawSplash();
   else if (screen === 'card') drawCard();
   else if (screen === 'play') drawPlay();
   else if (screen === 'win') drawEnd(true);
   else if (screen === 'lose') drawEnd(false);
+  else if (screen === 'legend') drawLegend();
+  ctx.restore();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
