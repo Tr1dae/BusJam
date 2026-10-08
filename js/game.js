@@ -31,8 +31,7 @@ const LOOP = { cx: 97, cy: 80, rx: 56, ry: 38 };
 const LANES = [-10.5, -3.5, 3.5, 10.5], ROW = 9, LOOP_SPEED = 30;
 const BAY_Y = 148, BAY_W = 26, BAY_H = 38, LOT_TOP = 194, SLOTS = 6, OPEN = 3, UNLOCK_COST = 500;
 // each extra bay costs more than the last: 500, 1,000, 1,500
-const unlockCost = i => (i - OPEN - (G && G.freeBays || 0) + 1) * UNLOCK_COST;
-let freeBay = 0;  // won by a clean Emergency Rush; opens one extra bay for the next shift
+const unlockCost = i => (i - OPEN + 1) * UNLOCK_COST;
 const bayX = i => 10 + i * 30, bayCx = i => bayX(i) + 13, bayCy = () => BAY_Y + 19;
 // beds park on a diagonal, nudged up-right so their porter fits in the bay behind them
 const PARK_DIR = 7, parkX = i => bayCx(i) + 3, parkY = () => bayCy() - 2;
@@ -306,9 +305,8 @@ function startLevel(n) {
   tries = n === level && G && G.n === n ? tries + 1 : 0;
   level = n; try { localStorage.setItem('aj.level', n); } catch (e) {}
   const gen = generateLevel(n, LOT, tries);
-  G = { n, cfg: gen.cfg, vehicles: gen.vehicles, offset: 0, rows: [], funnels: [], bays: [], open: (gen.cfg.open ?? OPEN) + freeBay, freeBays: freeBay, score: 0, shown: 0, floats: [], bonus: 0,
+  G = { n, cfg: gen.cfg, vehicles: gen.vehicles, offset: 0, rows: [], funnels: [], bays: [], open: gen.cfg.open ?? OPEN, score: 0, shown: 0, floats: [], bonus: 0,
         flyers: [], pops: [], over: null, moves: 0, blurb: pick(BLURBS), endLine: '', playT: 0, cameos: scheduleCameos(), cameo: null, leavers: [], breaks: Minis.scheduleBreaks(n) };
-  freeBay = 0;
   for (const v of G.vehicles) { v.state = 'lot'; v.px = v.x; v.py = v.y; v.revealed = !v.mystery; v.bumpT = 0; v.shake = 0; v.flipAnim = 0; }
   for (let i = 0; i < SLOTS; i++) G.bays.push({ state: 'empty', t: 0 });
   // fill loop rows in the order they will reach the door, the rest wait in the funnels
@@ -394,7 +392,7 @@ function drawFx() {
 }
 function drawConfetti() { for (const c of confetti) { const flat = Math.floor(c.t * 8 + c.ph) % 2; R(Math.round(c.x), Math.round(c.y), flat ? 2 : 1, flat ? 1 : 2, c.col); } }
 function win() {
-  const locked = SLOTS - G.open + (G.freeBays || 0); G.bonus = locked * UNLOCK_COST; G.score += 1000 + G.bonus;
+  const locked = SLOTS - G.open; G.bonus = locked * UNLOCK_COST; G.score += 1000 + G.bonus;
   career += G.score; try { localStorage.setItem('aj.total', career); } catch (e) {}
   G.over = 'win'; G.endLine = pick(WIN_LINES); overlayT = 0; Sound.sfx.win(); dropConfetti(90, true); setTimeout(() => { if (screen === 'play') screen = 'win'; }, 500); }
 function lose(why) { G.over = why; G.endLine = why === 'code' ? 'The crash cart got boxed in.' : pick(LOSE_LINES); overlayT = 0;
@@ -913,7 +911,7 @@ function drawCard() {
   let yy = y + 24;
   lines.forEach(l => { Font.smallCentered(ctx, l, 97, yy, '#475569'); yy += 7; });
   if (introLines.length) { yy += 4; R(x + 8, yy - 2, w - 16, introLines.length * 7 + 3, '#fff3c4'); introLines.forEach(l => { Font.smallCentered(ctx, l, 97, yy, '#7a4b00'); yy += 7; }); yy += 4; }
-  const clockIn = () => { Sound.sfx.start(); Sound.play('play'); screen = 'play'; if (G.freeBays) flash('FREE BAY! YOU EARNED IT.'); };
+  const clockIn = () => { Sound.sfx.start(); Sound.play('play'); screen = 'play'; };
   button('CLOCK IN', 97, y + h - 24, 80, '#22a35a', clockIn);
   addButton(0, 0, LW, LH, clockIn);
   buttons.unshift(buttons.pop()); // the specific button wins over the full-screen one

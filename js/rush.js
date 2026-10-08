@@ -172,7 +172,7 @@ const Rush = (() => {
       bump(false);
     }
     s.objs = s.objs.filter(o => o.z > s.z - 2);
-    if (s.z + PZ >= s.len) { s.done = 'win'; s.endT = 0; s.score += 500; Sound.sfx.win(); dropConfetti(40, true); say(pickOne(['WHEEE!', 'MADE IT!', "I'M FINE!"])); }
+    if (s.z + PZ >= s.len) { s.done = 'win'; s.endT = 0; s.score += 500 + (s.bumps === 0 ? 1000 : 0); Sound.sfx.win(); dropConfetti(40, true); say(pickOne(['WHEEE!', 'MADE IT!', "I'M FINE!"])); }
   }
   function bump(wall) {
     const s = S; if (s.hurt > 0 && !wall) return;
@@ -361,7 +361,7 @@ const Rush = (() => {
     Font.bigCentered(ctx, 'EMERGENCY RUSH!', 97, y + 5, '#fff', 1);
     const lines = Font.wrap('Get the ' + S.patient.name.toLowerCase() + ' patient to the ' + (S.dest === 'OR' ? 'OR' : 'ward') + ', fast. Tap a lane to switch. Tap your own lane to hop over low stuff. Tap TURN when it flashes. Three bumps and you\'re out.', w - 16);
     lines.forEach((l, i) => Font.smallCentered(ctx, l, 97, y + 24 + i * 7, '#475569'));
-    Font.smallCentered(ctx, 'NO BUMPS = A FREE BAY NEXT SHIFT', 97, y + h - 52, '#2e8a5f');
+    Font.smallCentered(ctx, 'NO BUMPS = +1,000 BONUS', 97, y + h - 52, '#2e8a5f');
     button('NEXT', 97, y + h - 42, 100, '#22a35a', () => { Sound.sfx.click(); screen = 'rushHow'; overlayT = 0; });
     button('SKIP', 97, y + h - 22, 100, '#64748b', () => { Sound.sfx.click(); finish(false); });
   }
@@ -402,12 +402,12 @@ const Rush = (() => {
     Font.bigCentered(ctx, won ? 'DELIVERED!' : 'PATIENT TOOK THE STAIRS', 97, y + 5, '#fff', 1);
     Font.bigCentered(ctx, fmt(s.score), 97, y + 24, won ? '#22a35a' : '#c0392b', 2, K);
     Font.smallCentered(ctx, 'COFFEES ' + s.coffees + '   BUMPS ' + s.bumps, 97, y + 45, '#475569');
-    Font.smallCentered(ctx, clean ? 'CLEAN RUN! FREE BAY NEXT SHIFT' : won ? 'NO FREE BAY. MIND THE CARTS.' : 'SOMEONE CALL FACILITIES.', 97, y + 55, clean ? '#2e8a5f' : '#94a3b8');
+    Font.smallCentered(ctx, clean ? 'CLEAN RUN! +1,000 BONUS' : won ? 'NO BONUS. MIND THE CARTS.' : 'SOMEONE CALL FACILITIES.', 97, y + 55, clean ? '#2e8a5f' : '#94a3b8');
     button('NEXT SHIFT', 97, y + h - 24, 110, '#22a35a', () => { Sound.sfx.click(); finish(true); });
     drawConfetti();
   }
   function finish(played) {
-    const s = S; if (played) { const pts = Math.round(s.score); career += pts; try { localStorage.setItem('aj.total', career); } catch (e) {} if (s.done === 'win' && s.bumps === 0) freeBay = 1; }
+    const s = S; if (played) { const pts = Math.round(s.score); career += pts; try { localStorage.setItem('aj.total', career); } catch (e) {} }
     S = null; Sound.play('title'); startLevel(level + 1); screen = 'card'; overlayT = 0;
   }
 

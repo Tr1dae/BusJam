@@ -43,7 +43,7 @@ const Minis = (() => {
       [(x, y) => bubble('JELLO?', x, y - 5, '#fff', '#3d6fb6'), 'WHITE = NOT URGENT', 'TAP IT AND YOU LOSE TIME', '#3d6fb6'],
       [(x, y) => putC(Sprites.staff('doctor', ['#4f3322', '#38231a'], 0, false), x, y + 9, 0.9), 'DOCTOR = DO NOT ENGAGE', 'HE JUST WANTS A FAVOUR', '#64748b'],
     ],
-    goal: 'NO MISSED CALLS = A FREE BAY NEXT SHIFT',
+    goal: 'NO MISSED CALLS = +1,000 BONUS',
     init(m) {
       m.dur = 30; m.lives = 3; m.spawnT = 0.8; m.busy = 0; m.busyMax = 1; m.busyText = ''; m.answered = 0; m.missed = 0; m.combo = 0;
       const nums = [101, 102, 103, 104, 105, 106, 107, 108, 109].sort(() => Math.random() - 0.5);
@@ -133,7 +133,7 @@ const Minis = (() => {
       [(x, y) => putC(Sprites.icon(DEPTS[0]), x, y + 7, 2), 'TAP AS THE HEART HITS THE RING', 'ANYWHERE ON THE SCREEN', '#c0392b'],
       [(x, y) => putC(bolt(), x, y + 8, 2), 'BOLT = SHOCK', 'TAP IT ON THE BEAT TOO', '#b07a00'],
     ],
-    goal: '90% ON THE BEAT = A FREE BAY NEXT SHIFT',
+    goal: '90% ON THE BEAT = +1,000 BONUS',
     init(m) {
       m.bpm = Math.min(120, Math.round(100 + m.shift * 1.5)); m.spb = 60 / m.bpm; m.notes = []; m.perfects = 0; m.goods = 0; m.misses = 0; m.combo = 0; m.best = 0;
       m.press = 0; m.zap = 0; m.trace = new Array(150).fill(0); m.traceT = 0; m.pressSpike = 0; m.rosc = false; m.charged = false;
@@ -247,7 +247,7 @@ const Minis = (() => {
       [(x, y) => putC(PILLS.tylenol.img(), x, y + 7, 2), 'TYLENOL IS ALWAYS FINE', 'A FEW POINTS, NO HARM', '#64748b'],
       [(x, y) => putC(PILLS.k.img(), x, y + 7, 1.5), 'ANYTHING ELSE = WRONG MED', 'THREE AND IT IS AN INCIDENT REPORT', '#c0392b'],
     ],
-    goal: 'NO WRONG MEDS = A FREE BAY NEXT SHIFT',
+    goal: 'NO WRONG MEDS = +1,000 BONUS',
     init(m) { m.dur = 30; m.lives = 3; m.cx = 97; m.tx = 97; m.pills = []; m.spawnT = 0.6; m.combo = 0; m.caught = 0; m.wrong = 0; m.bed = 0; m.orderT = 0; meds.newOrder(m); },
     newOrder(m) { const o = ORDERABLE.slice().sort(() => Math.random() - 0.5); m.order = o.slice(0, 2); m.bed = 1 + Math.floor(Math.random() * 12); m.orderT = 0; m.flashOrder = 1; },
     cupY: () => LH - 48,
@@ -440,7 +440,7 @@ const Minis = (() => {
   }
   function between(n) { const k = ROTATION[(n - 1) % ROTATION.length]; if (k === 'rush') { M = null; Rush.begin(n); } else begin(k, n, 'between'); }
   function go() { Sound.sfx.start(); Sound.play(M.g.song || 'rush'); if (M.g.start) M.g.start(M); screen = 'mini'; overlayT = 0; }
-  function end(m, how) { if (m.done) return; m.done = how; m.endT = 0; if (how === 'lose') Sound.sfx.lose(); else if (!m.g.isBreak && m.kind !== 'cpr') { Sound.sfx.win(); dropConfetti(30, true); } }
+  function end(m, how) { if (m.done) return; m.done = how; m.endT = 0; if (!m.g.isBreak && m.g.stats(m)[1]) m.score += 1000; if (how === 'lose') Sound.sfx.lose(); else if (!m.g.isBreak && m.kind !== 'cpr') { Sound.sfx.win(); dropConfetti(30, true); } }
   function update(dt) {
     if (!M || screen !== 'mini') return;
     M.pops.forEach(p => p.t += dt); M.pops = M.pops.filter(p => p.t < 0.9);
@@ -474,7 +474,7 @@ const Minis = (() => {
     Font.bigCentered(ctx, (brk ? '+' : '') + fmt(m.score), 97, y + 24, '#22a35a', 2, K);
     if (brk) Font.smallCentered(ctx, 'ADDED TO THIS SHIFT', 97, y + 45, '#475569');
     else { Font.smallCentered(ctx, line, 97, y + 45, '#475569');
-      Font.smallCentered(ctx, clean ? 'CLEAN! FREE BAY NEXT SHIFT' : 'NO FREE BAY THIS TIME', 97, y + 55, clean ? '#2e8a5f' : '#94a3b8'); }
+      Font.smallCentered(ctx, clean ? 'CLEAN RUN! +1,000 BONUS' : 'NO CLEAN-RUN BONUS THIS TIME', 97, y + 55, clean ? '#2e8a5f' : '#94a3b8'); }
     button(brk ? 'BACK TO WORK' : 'NEXT SHIFT', 97, y + h - 24, 110, '#22a35a', () => { Sound.sfx.click(); finish(true); });
     drawConfetti();
   }
@@ -484,7 +484,7 @@ const Minis = (() => {
       if (played && m.score) { G.score += m.score; G.floats.push({ text: '+' + fmt(m.score) + ' BREAK', x: 97, y: 120, t: 0, col: '#ffe066' }); }
       Sound.play('play'); screen = 'play'; overlayT = 0; return;
     }
-    if (played) { career += Math.round(m.score); try { localStorage.setItem('aj.total', career); } catch (e) {} if (m.g.stats(m)[1]) freeBay = 1; }
+    if (played) { career += Math.round(m.score); try { localStorage.setItem('aj.total', career); } catch (e) {} }
     Sound.play('title'); startLevel(level + 1); screen = 'card'; overlayT = 0;
   }
   function frame() {

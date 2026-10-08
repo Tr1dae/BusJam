@@ -15,7 +15,7 @@ Coloured hospital beds are jammed in the corridor. Tap one to roll it out the wa
 
 ## Between shifts
 
-Every shift is followed by a minigame, in rotation: Call Light Frenzy, Emergency Rush, Code Blue, Med Pass. Each has a start page that shows what to grab and what to avoid, can be skipped, and earns a free bay for the next shift on a clean run.
+Every shift is followed by a minigame, in rotation: Call Light Frenzy, Emergency Rush, Code Blue, Med Pass. Each has a start page that shows what to grab and what to avoid, can be skipped, and pays a +1,000 bonus on a clean run.
 
 - **Call Light Frenzy:** nine rooms, call lights going off. Tap red (real) calls before they time out; white ones (blankets, jello, wifi) and the doctor's favours just cost time. Three missed calls ends it.
 - **Code Blue:** a rhythm game. Tap on the beat to do compressions (100-120 bpm, synced to the audio clock), tap the bolt to shock. 90% on the beat is a clean run.
@@ -25,7 +25,7 @@ Once or twice a shift (from shift 2) a surprise break pauses play: **Coffee Pour
 
 ## Emergency Rush
 
-A short dash: a porter pushes the bed down pseudo-3D hospital corridors to the OR or ward double doors. Tap a lane to switch, tap your own lane to hop over low things (wet floor signs, mop buckets, spills), dodge tall ones (crash carts, beds, vending machines, strolling patients, a doctor on his phone), grab coffee (chains score more), department icons (+50; a heart also gives a life back) and the siren (a short boost that smashes through obstacles), and tap the big TURN button before each 90° corner. Three bumps ends the run; a clean run earns a free bay for the next shift. A second start page shows each pickup and obstacle with its sprite. It can be skipped. Add `?rush` to the URL to jump straight into one. Code is in `js/rush.js`.
+A short dash: a porter pushes the bed down pseudo-3D hospital corridors to the OR or ward double doors. Tap a lane to switch, tap your own lane to hop over low things (wet floor signs, mop buckets, spills), dodge tall ones (crash carts, beds, vending machines, strolling patients, a doctor on his phone), grab coffee (chains score more), department icons (+50; a heart also gives a life back) and the siren (a short boost that smashes through obstacles), and tap the big TURN button before each 90° corner. Three bumps ends the run; a clean run is worth a +1,000 bonus. A second start page shows each pickup and obstacle with its sprite. It can be skipped. Add `?rush` to the URL to jump straight into one. Code is in `js/rush.js`.
 
 ## Running it
 
