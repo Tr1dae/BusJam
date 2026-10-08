@@ -95,6 +95,7 @@ const WIN_LINES = ["They'll be back.", 'Beds are clean. For eleven minutes.', 'H
 const LOSE_LINES = ['Somebody page the charge nurse.', "Time for a coffee you won't finish.", 'Code Brown in the hallway.'];
 const INTROS = {
   1: "Tap a bed to roll it out. Patients hop on the bed for their department. Full beds head off. Clear the jam! Locked bays cost 500, then 1,000, then 1,500. Tap the nurses' station to see who's who.",
+  2: "New: the first patients through the door are for beds buried deep in the jam. Start digging.",
   3: 'New: triage pending. Grey beds hide their department until the way ahead is clear.',
   5: 'New: flip-floppers. Beds with the yellow arrows turn around every time you send another one off.',
   7: 'New: code blue! The crash cart has to leave before its counter hits zero. Every move counts.',
@@ -297,11 +298,13 @@ let screen = 'splash', G = null, T = 0, toast = null, buttons = [], overlayT = 0
 let level = 1;
 try { level = parseInt(new URLSearchParams(location.search).get('level')) || parseInt(localStorage.getItem('aj.level')) || 1; } catch (e) {}
 
+let tries = 0;  // retries of the current shift; each retry deals a new layout
 function startLevel(n) {
+  tries = n === level && G && G.n === n ? tries + 1 : 0;
   level = n; try { localStorage.setItem('aj.level', n); } catch (e) {}
-  const gen = generateLevel(n, LOT);
+  const gen = generateLevel(n, LOT, tries);
   G = { n, cfg: gen.cfg, vehicles: gen.vehicles, offset: 0, rows: [], funnels: [], bays: [], open: gen.cfg.open ?? OPEN, score: 0, shown: 0, floats: [], bonus: 0,
-        flyers: [], pops: [], over: null, moves: 0, blurb: pick(BLURBS), endLine: '', playT: 0, cameos: scheduleCameos(), cameo: null };
+        flyers: [], pops: [], over: null, moves: 0, blurb: pick(BLURBS), endLine: '', playT: 0, cameos: scheduleCameos(), cameo: null, leavers: [] };
   for (const v of G.vehicles) { v.state = 'lot'; v.px = v.x; v.py = v.y; v.revealed = !v.mystery; v.bumpT = 0; v.shake = 0; v.flipAnim = 0; }
   for (let i = 0; i < SLOTS; i++) G.bays.push({ state: 'empty', t: 0 });
   // fill loop rows in the order they will reach the door, the rest wait in the funnels
@@ -454,20 +457,23 @@ function update(dt) {
     if (fl.t >= 1 && !fl.done) {
       fl.done = true; const bb = G.bays[fl.bay]; bb.filled++; addScore(10);
       Sound.sfx.board(Math.floor(bb.filled / bb.v.cap * 9)); G.pops.push({ dept: fl.dept, x: bayCx(fl.bay) + (Math.random() - 0.5) * 8, y: BAY_Y + 6, t: 0, vx: (Math.random() - 0.5) * 16 });
-      if (bb.filled >= bb.v.cap) { bb.state = 'full'; bb.t = 0; bb.stamp = T; sparkle(bayCx(fl.bay), BAY_Y + 14, 18, [bb.v.dept.T, bb.v.dept.L, '#ffffff']); }
+      if (bb.filled >= bb.v.cap) {
+        // the bay frees up straight away; the full bed jiggles, then reverses out and zooms off on its own
+        G.leavers.push({ v: bb.v, bay: fl.bay, t: 0, stamp: T }); G.bays[fl.bay] = { state: 'empty', t: 0 };
+        sparkle(bayCx(fl.bay), BAY_Y + 14, 18, [bb.v.dept.T, bb.v.dept.L, '#ffffff']); }
     }
   }
   G.flyers = G.flyers.filter(f => !f.done);
   G.pops.forEach(p => { p.t += dt; p.x += p.vx * dt; p.y -= 24 * dt; }); G.pops = G.pops.filter(p => p.t < 0.9);
-  G.bays.forEach(bb => {
-    bb.t += dt;
-    if (bb.state === 'full' && bb.t > 0.35) { bb.state = 'leaving'; bb.t = 0; Sound.sfx.siren(); addScore(bb.v.cap * 5, bayCx(G.bays.indexOf(bb)), BAY_Y + 6, true); }
-    else if (bb.state === 'leaving' && bb.t > 0.6 && !bb.zoom) { bb.zoom = true; const k = G.bays.indexOf(bb); puff(bayCx(k) - 8, bayCy() + 32, 8); }
-    else if (bb.state === 'leaving' && bb.t > 1.6) { bb.v.state = 'gone'; Object.assign(bb, { state: 'empty', v: null, t: 0, zoom: false }); }
-  });
+  G.bays.forEach(bb => { bb.t += dt; });
+  for (const L of G.leavers) { const was = L.t; L.t += dt;
+    if (was < 0.35 && L.t >= 0.35) { Sound.sfx.siren(); addScore(L.v.cap * 5, bayCx(L.bay), BAY_Y + 6, true); }
+    if (was < 0.95 && L.t >= 0.95) puff(bayCx(L.bay) - 8, bayCy() + 32, 8);
+    if (L.t > 1.95) L.v.state = 'gone'; }
+  G.leavers = G.leavers.filter(L => L.t <= 1.95);
   if (G.over) return;
   // win / lose
-  const busy = G.flyers.length || G.vehicles.some(v => v.state === 'exit' || v.state === 'route' || v.bumpT > 0) || G.bays.some(b => b.state === 'full' || b.state === 'leaving' || b.state === 'reserved') || G.rows.some(r => r.enter);
+  const busy = G.flyers.length || G.vehicles.some(v => v.state === 'exit' || v.state === 'route' || v.bumpT > 0) || G.leavers.length || G.bays.some(b => b.state === 'reserved') || G.rows.some(r => r.enter);
   if (busy) return;
   const loopHas = G.rows.some(r => !rowEmpty(r)), queued = G.funnels.some(f => f.q.length);
   if (!loopHas && !queued && G.vehicles.every(v => v.state === 'gone') && G.bays.every(b => b.state === 'empty')) { win(); return; }
@@ -793,16 +799,13 @@ function drawPlay() {
       Font.smallCentered(ctx, '-' + fmt(unlockCost(i)), bayCx(i), BAY_Y + 26, '#ff8a8f');
       continue; }
     for (let k = 0; k < BAY_H; k++) { R(bx, BAY_Y + k, 1, 1, '#e6e9ee'); R(bx + BAY_W - 1, BAY_Y + k, 1, 1, '#e6e9ee'); }
-    if (bb.state === 'parked' || bb.state === 'full') {
-      const jig = bb.state === 'full' ? Math.round(Math.sin(bb.t * 70)) : 0, land = T - (bb.land ?? -9) < 0.3 ? Math.round(Math.sin((T - bb.land) / 0.3 * Math.PI) * 2) : 0;
+    if (bb.state === 'parked') {
+      const jig = 0, land = T - (bb.land ?? -9) < 0.3 ? Math.round(Math.sin((T - bb.land) / 0.3 * Math.PI) * 2) : 0;
       drawVehicle(bb.v, bayCx(i) + jig, bayCy() - land, { noShadow: true });
-      if (bb.state === 'parked') { const s = String(bb.v.cap - bb.filled), w = Font.smallWidth(s) + 6;
+      { const s = String(bb.v.cap - bb.filled), w = Font.smallWidth(s) + 6;
         R(bayCx(i) - w / 2, BAY_Y + BAY_H - 8, w, 7, bb.v.dept.t); Font.small(ctx, s, bayCx(i) - w / 2 + 3, BAY_Y + BAY_H - 7, '#fff'); }
     }
   }
-  // FULL! stamp drops onto a bay as it fills
-  G.bays.forEach((bb, i) => { const age = T - (bb.stamp ?? -9); if (age > 1.1 || i >= G.open) return;
-    ctx.globalAlpha = age < 0.9 ? 1 : (1.1 - age) / 0.2; Font.bigCentered(ctx, 'FULL!', bayCx(i), bayCy() - 4 - Math.round(Math.max(0, 1 - age * 8) * 10), '#ffe066', 1, K); ctx.globalAlpha = 1; });
   // lot
   const lot = G.vehicles.filter(v => v.state === 'lot').sort((a, b) => a.y - b.y);
   for (const v of lot) { let off = 0; if (v.bumpT > 0) off = v.bumpDist * Math.sin(Math.PI * v.bumpT);
@@ -827,13 +830,18 @@ function drawPlay() {
   drawPeople(walkers);
   // moving vehicles on top
   for (const v of G.vehicles) if (v.state === 'exit' || v.state === 'route') drawVehicle(v, v.px, v.py, v.away ? { siren: Math.floor(T * 10) % 2 === 0 } : {});
-  G.bays.forEach((bb, i) => { if (bb.state !== 'leaving') return; const t = bb.t, v = bb.v, flash = Math.floor(t * 10) % 2 === 0, ax = bayCx(i), ay = bayCy();
+  for (const L of G.leavers) { const v = L.v, ax = bayCx(L.bay), ay = bayCy();
+    if (L.t < 0.35) { v.dir = 6; drawVehicle(v, ax + Math.round(Math.sin(L.t * 70)), ay, { noShadow: true }); continue; }
+    const t = L.t - 0.35, flash = Math.floor(t * 10) % 2 === 0;
     let dir = 6, px = ax, py = ay;
     if (t < 0.45) py = ay + ease(t / 0.45) * 30;
     else if (t < 0.6) { dir = 7; py = ay + 30; px = ax + 2; }
     else { dir = 0; const u = t - 0.6; py = ay + 32; px = ax + 4 + u * u * 260; }
     v.dir = dir; drawVehicle(v, px, py, { siren: flash, noShadow: true });
-    if (dir === 0 && t > 0.7) for (let k = 1; k < 4; k++) R(Math.round(px - v.len / 2 - k * 5 - (t * 40) % 4), Math.round(py) - 3 + k * 2, 3, 1, 'rgba(255,255,255,.7)'); });
+    if (dir === 0 && t > 0.7) for (let k = 1; k < 4; k++) R(Math.round(px - v.len / 2 - k * 5 - (t * 40) % 4), Math.round(py) - 3 + k * 2, 3, 1, 'rgba(255,255,255,.7)'); }
+  // FULL! stamp drops onto a bay as it fills
+  G.leavers.forEach(L => { const age = T - L.stamp, i = L.bay; if (age > 1.1) return;
+    ctx.globalAlpha = age < 0.9 ? 1 : (1.1 - age) / 0.2; Font.bigCentered(ctx, 'FULL!', bayCx(i), bayCy() - 4 - Math.round(Math.max(0, 1 - age * 8) * 10), '#ffe066', 1, K); ctx.globalAlpha = 1; });
   drawFx();
   for (const p of G.pops) { ctx.globalAlpha = p.t < 0.7 ? 1 : Math.max(0, 1 - (p.t - 0.7) / 0.2); blit(Sprites.icon(p.dept), p.x, p.y); ctx.globalAlpha = 1; }
   for (const f of G.floats) { ctx.globalAlpha = f.t < 1 ? 1 : Math.max(0, 1 - (f.t - 1) / 0.4); Font.bigCentered(ctx, f.text, Math.round(f.x), Math.round(f.y), f.col, 1, K); ctx.globalAlpha = 1; }

@@ -8,7 +8,8 @@ Coloured hospital beds are jammed in the corridor. Tap one to roll it out the wa
 - **Quirks:** triage-pending grey beds (shift 3+), flip-floppers that turn around every move (shift 5+), and the Code Blue crash cart with a move counter (shift 7+).
 - **The ward:** the loop runs round a nurses' station; tap the station sign for the patient legend, which also pauses the shift. Fish tank, wet floor sign, wheelchair, therapy corgi, sleeping visitor, pot plant, vending machine, coffee machine and wall clock (real time) all react to taps.
 - **Cameos:** once a shift one of Becca's friends (Becca, Sarah, Jess, Carly, Katrina, Jann, Angela, Sophie) walks on in green scrubs with a comment; now and then a doctor pops up with a daft request. Tap the bubble to skip.
-- **Difficulty:** from shift 3 fewer rows of patients fit on the loop at once (the rest wait in the side queues), and from shift 4 patients increasingly turn up for beds still buried in the jam. Both are set in `levelConfig` (`window`, `scatter`).
+- **Difficulty:** shift 1 is a tutorial. From shift 2 the first patients belong to beds buried deep in the jam (more of them later on), only so many rows fit on the loop at once (the rest queue at the sides), patient blocks are shuffled away from the order beds can get out, and departments ramp up faster. All in `levelConfig` (`buried`, `window`, `scatter`, `depts`). Retrying a shift deals a fresh layout.
+- **Bays free up instantly:** as soon as a bed fills, its bay is free for the next bed while the full one reverses out.
 - **Bays and score:** 3 bays are open and 3 are locked. Opening them costs 500, then 1,000, then 1,500 points; any left locked at the end of a shift are worth +500 each. Patients score 10 each, departures 5 per seat, a cleared shift 1,000, and the career total is saved.
 
 ## Running it

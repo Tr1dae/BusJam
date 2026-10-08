@@ -33,7 +33,7 @@ const LEVEL_SHAPES = [
 function levelConfig(n) {
   return {
     vehicles: Math.min(12 + n * 2, 44),
-    depts: Math.min(3 + Math.floor((n - 1) / 2), 6),
+    depts: n < 2 ? 3 : Math.min(4 + Math.floor((n - 2) / 2), 6),
     diag: n >= 2,
     sizes: n < 2 ? [1, 1, 0] : [1, 1.2, 0.8],
     mystery: n >= 3 ? Math.min(0.12 + 0.02 * (n - 3), 0.3) : 0,
@@ -42,9 +42,11 @@ function levelConfig(n) {
     cartTimer: 7,
     mix: Math.min(0.15 + n * 0.03, 0.45),
     // how many rows of patients can be on the loop at once (0 = as many as fit); fewer rows means less to choose from
-    window: n <= 2 ? 0 : Math.max(14, 26 - n),
+    window: n < 2 ? 0 : Math.max(10, 18 - n),
     // how far patient blocks drift from the order their ambulances can get out
-    scatter: n < 4 ? 0 : Math.min(1 + 0.3 * n, 4),
+    scatter: n < 2 ? 0 : Math.min(2 + n, 8),
+    // the first patients through the door belong to this many beds buried deep in the jam
+    buried: n < 2 ? 0 : Math.min(1 + Math.floor((n - 2) / 3), 3),
     // early shifts use a smaller lot so the jam still looks like a jam
     shape: ((base, ls) => (u, v) => base(u / ls, v / ls))(LEVEL_SHAPES[(n - 1) % LEVEL_SHAPES.length], Math.min(1, 0.5 + n * 0.025)),
   };
@@ -71,12 +73,13 @@ function validateLevel(vs) {
   }
   return null;
 }
-function generateLevel(n, lot) {
+// variant > 0 gives a fresh layout for the same shift (used on retries, so a bad deal never traps anyone)
+function generateLevel(n, lot, variant = 0) {
   for (let attempt = 0; attempt < 20; attempt++) {
-    const lvl = generateOnce(n, lot, n * 7919 + 3 + attempt * 104729);
+    const lvl = generateOnce(n, lot, n * 7919 + 3 + variant * 15485863 + attempt * 104729);
     if (!validateLevel(lvl.vehicles)) return lvl;
   }
-  return generateOnce(n, lot, n * 7919 + 3);
+  return generateOnce(n, lot, n * 7919 + 3 + variant * 15485863);
 }
 function generateOnce(n, lot, seed) {
   const r = rng(seed), cfg = levelConfig(n);
@@ -122,12 +125,26 @@ function generateOnce(n, lot, seed) {
   const deptPool = DEPTS.slice(0, cfg.depts);
   order.forEach((v, i) => { v.id = i; if (v.kind === 'amb') { v.dept = deptPool[Math.floor(r() * deptPool.length)]; v.mystery = r() < cfg.mystery; } });
 
+  // buried openers: pick a few of the last beds to come out, give them one department that no bed
+  // near the surface shares, and send their patients first, so the player has to dig for them
+  const ambs = order.filter(v => v.kind === 'amb'), cut = Math.floor(ambs.length * 0.6);
+  let lead = [];
+  if (cfg.buried && ambs.length > 6 && deptPool.length > 1) {
+    const D0 = deptPool[Math.floor(r() * deptPool.length)], others = deptPool.filter(d => d !== D0), deep = ambs.slice(cut);
+    // keep the openers to under half the loop, so there is always something else to work on while digging
+    let room = Math.floor((cfg.window || 26) * 0.45);
+    while (lead.length < cfg.buried && deep.length) { const v = deep.splice(Math.floor(r() * deep.length), 1)[0], rows = Math.ceil(v.cap / 4);
+      if (rows <= room) { lead.push(v); room -= rows; } }
+    lead.forEach(v => v.dept = D0);
+    ambs.slice(0, cut).forEach(v => { if (v.dept === D0) v.dept = others[Math.floor(r() * others.length)]; });
+  }
   // patients come in rows of 4 of one department, in solution order, lightly shuffled
-  // each ambulance's patients arrive as one solid block; neighbouring blocks sometimes swap
-  const blocks = order.filter(v => v.kind === 'amb').map(v => Array.from({ length: Math.ceil(v.cap / 4) }, (_, k) => ({ dept: v.dept, n: Math.min(4, v.cap - k * 4) })));
+  // each bed's patients arrive as one solid block; neighbouring blocks sometimes swap
+  const blockOf = v => Array.from({ length: Math.ceil(v.cap / 4) }, (_, k) => ({ dept: v.dept, n: Math.min(4, v.cap - k * 4) }));
+  const blocks = ambs.filter(v => !lead.includes(v)).map(blockOf);
   for (let i = 0; i + 1 < blocks.length; i++) if (r() < cfg.mix) { [blocks[i], blocks[i + 1]] = [blocks[i + 1], blocks[i]]; i++; }
   // later shifts scatter the blocks further, so patients turn up for ambulances still buried in the jam
   if (cfg.scatter) { const keyed = blocks.map((b, i) => ({ b, k: i + r() * cfg.scatter })); keyed.sort((a, b) => a.k - b.k); keyed.forEach((x, i) => blocks[i] = x.b); }
-  const rows = blocks.flat();
+  const rows = lead.map(blockOf).concat(blocks).flat();
   return { vehicles: order, rows, cfg };
 }
