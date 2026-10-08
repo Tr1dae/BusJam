@@ -15,7 +15,7 @@ Coloured hospital beds are jammed in the corridor. Tap one to roll it out the wa
 
 ## Emergency Rush
 
-After every second shift there's a short dash: a porter pushes the bed down pseudo-3D hospital corridors to the OR or ward double doors. Tap a lane to switch, tap your own lane to hop over low things (wet floor signs, mop buckets, spills), dodge tall ones (crash carts, beds, vending machines, strolling patients, a doctor on his phone), grab coffee and department icons, and tap the big TURN button before each 90° corner. Three bumps ends the run; a clean run earns a free bay for the next shift. It can be skipped. Add `?rush` to the URL to jump straight into one. Code is in `js/rush.js`.
+After every second shift there's a short dash: a porter pushes the bed down pseudo-3D hospital corridors to the OR or ward double doors. Tap a lane to switch, tap your own lane to hop over low things (wet floor signs, mop buckets, spills), dodge tall ones (crash carts, beds, vending machines, strolling patients, a doctor on his phone), grab coffee (chains score more), department icons (+50; a heart also gives a life back) and the siren (a short boost that smashes through obstacles), and tap the big TURN button before each 90° corner. Three bumps ends the run; a clean run earns a free bay for the next shift. A second start page shows each pickup and obstacle with its sprite. It can be skipped. Add `?rush` to the URL to jump straight into one. Code is in `js/rush.js`.
 
 ## Running it
 

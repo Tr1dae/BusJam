@@ -4,7 +4,7 @@
 const Rush = (() => {
   const DRAW = 56;                 // segments drawn ahead (1 segment = 1 lane width)
   const PZ = 3;                    // player sits this far in front of the camera
-  const LANE_PX = 50;              // lane width in pixels at the player's depth
+  const LANE_PX = 60;              // lane width in pixels at the player's depth
   const K3 = LANE_PX * PZ;         // focal length * pixels per unit
   const WALL = 1.75;               // corridor half width (lanes are at -1, 0, 1)
   const hor = () => Math.round(LH * 0.36), floorY = () => LH - 46;
@@ -122,7 +122,7 @@ const Rush = (() => {
       else { objs.push({ type: 'doctor', lane: lanes[0], z: z + 10, walk: 2.2 }); free = [lanes[1], lanes[2]]; }
       // a line of coffee down a free lane, sometimes a department icon or the siren
       if (Math.random() < 0.55 && free.length) { const l = pickOne(free); for (let k = 1; k <= 4; k++) objs.push({ type: 'coffee', lane: l, z: z + 1.5 + k * 1.3 }); }
-      else if (Math.random() < 0.3 && free.length) objs.push({ type: 'icon', lane: pickOne(free), z: z + 3, dept: pickOne(depts) });
+      else if (Math.random() < 0.35 && free.length) objs.push({ type: 'icon', lane: pickOne(free), z: z + 3, dept: Math.random() < 0.4 ? DEPTS[0] : pickOne(depts) });
       if (!sirenPlaced && z > len * 0.4 && free.length && Math.random() < 0.3) { objs.push({ type: 'siren', lane: pickOne(free), z: z + 4 }); sirenPlaced = true; }
     }
     return { track, objs, turns, len, speed, dest: pickOne(['OR', 'WARD']) };
@@ -162,7 +162,7 @@ const Rush = (() => {
     const pz = s.z + PZ, jumpH = s.jump >= 0 ? Math.sin(s.jump * Math.PI) : 0;
     for (const o of s.objs) {
       if (o.gone || o.z > pz + 0.35 || o.z < pz - 0.6) continue;
-      const def = OBJ[o.type], reach = def.w / 2 + 0.32;
+      const def = OBJ[o.type], reach = def.w / 2 + (def.pickup ? 0.4 : 0.32);
       if (Math.abs(o.lane - s.laneX) > reach) continue;
       if (def.pickup) { o.gone = true; collect(o); continue; }
       if (def.low && jumpH > 0.3) { o.cleared = true; if (!o.scored) { o.scored = true; s.score += 15; } continue; }
@@ -183,7 +183,8 @@ const Rush = (() => {
   function collect(o) {
     const s = S, x = LW / 2 + (o.lane - s.laneX) * LANE_PX, y = floorY() - 30;
     if (o.type === 'coffee') { s.coffees++; s.combo++; s.score += 10 * Math.min(s.combo, 5); Sound.sfx.board(Math.min(s.combo, 9)); s.pops.push({ text: '+' + 10 * Math.min(s.combo, 5), x, y, t: 0 }); }
-    if (o.type === 'icon') { s.score += 50; Sound.sfx.bonus(); sparkle(x, y, 12, [o.dept.T, o.dept.L]); s.pops.push({ text: '+50', x, y, t: 0 }); }
+    if (o.type === 'icon') { s.score += 50; Sound.sfx.bonus(); sparkle(x, y, 12, [o.dept.T, o.dept.L]); s.pops.push({ text: '+50', x, y, t: 0 });
+      if (o.dept === DEPTS[0] && s.lives < 3) { s.lives++; say('+1 HEART!', '#ffd6dc'); } }
     if (o.type === 'siren') { s.boost = 4.5; Sound.sfx.siren(); say('NEE NAW!'); }
   }
   function startPan(turn) { S.pan = { t: 0, dir: turn.dir, turn, flipped: false }; Sound.sfx.whirr(); }
@@ -296,38 +297,43 @@ const Rush = (() => {
   function drawObj(o, p) {
     const def = OBJ[o.type], img = sprite(o), k = p.s / 32;
     let w = img.width * k, h = img.height * k;
-    if (o.type === 'icon') { w = 0.4 * p.s; h = 0.4 * p.s; }
+    if (o.type === 'icon') { w = 0.5 * p.s; h = 0.5 * p.s; } else if (def.pickup) { w *= 1.25; h *= 1.25; }
     const bob = def.pickup ? Math.sin(T * 5 + o.z) * 0.08 * p.s + 0.25 * p.s : 0;
     if (w < 1 || h < 1) return;
+    // pickups glow and twinkle so they read as treats, not obstacles
+    if (def.pickup && w > 3) { const cy = Math.round(p.y - h / 2 - bob), r = Math.round(w * (0.75 + Math.sin(T * 6 + o.z) * 0.08));
+      ctx.globalAlpha = 0.35; ellipse(Math.round(p.x), cy, r, r, '#fff7b0'); ctx.globalAlpha = 1;
+      if (w > 8 && Math.floor(T * 4 + o.z) % 3 === 0) { const tx = Math.round(p.x + w * 0.55), ty = cy - Math.round(h * 0.5); R(tx - 1, ty, 3, 1, '#fff'); R(tx, ty - 1, 1, 3, '#fff'); } }
     ctx.globalAlpha = 0.2; ellipse(Math.round(p.x), Math.round(p.y), Math.max(1, Math.round(w / 2)), Math.max(1, Math.round(p.s * 0.06)), '#1d2b3a'); ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, Math.round(p.x - w / 2), Math.round(p.y - h - bob), Math.round(w), Math.round(h));
     if (o.type === 'siren' && Math.floor(T * 8) % 2) { ctx.globalAlpha = 0.3; ellipse(Math.round(p.x), Math.round(p.y - h / 2 - bob), Math.round(w), Math.round(w * 0.8), '#ff4d4d'); ctx.globalAlpha = 1; }
   }
   function drawPlayer() {
-    const s = S, x = Math.round(LW / 2 + (s.laneX - s.laneX * 0.55) * LANE_PX), fy = floorY(), jumpH = s.jump >= 0 ? Math.sin(s.jump * Math.PI) : 0, lift = Math.round(jumpH * 34);
-    const blink = s.hurt > 0 && Math.floor(T * 14) % 2, tilt = Math.round((s.lane - s.laneX) * 3);
-    ctx.globalAlpha = 0.25; ellipse(x, fy + 4, Math.round(26 - jumpH * 8), 4, '#1d2b3a'); ctx.globalAlpha = 1;
+    const Z = 1.2, u = v => Math.round(v * Z);  // the bed and porter are drawn a size up for readability
+    const s = S, x = Math.round(LW / 2 + (s.laneX - s.laneX * 0.55) * LANE_PX), fy = floorY(), jumpH = s.jump >= 0 ? Math.sin(s.jump * Math.PI) : 0, lift = Math.round(jumpH * 40);
+    const blink = s.hurt > 0 && Math.floor(T * 14) % 2, tilt = Math.round((s.lane - s.laneX) * 4);
+    ctx.globalAlpha = 0.25; ellipse(x, fy + 4, Math.round(u(26) - jumpH * 10), 5, '#1d2b3a'); ctx.globalAlpha = 1;
     if (blink) ctx.globalAlpha = 0.45;
     const y = fy - lift, d = s.patient;
     // far wheels, frame, blanket, near rail
-    for (const wx of [-16, 16]) { R(x + wx - 1 + tilt, y - 28, 1, 6, '#6c7484'); R(x + wx - 2 + tilt, y - 23, 4, 3, K); }
-    for (const wx of [-20, 20]) { R(x + wx, y - 10, 1, 8, '#6c7484'); R(x + wx - 2, y - 3, 5, 4, K); R(x + wx - 1, y - 2, 2, 1, '#9aa3b2'); }
-    rows(y - 9, x - 23, x + 23, y - 33, x - 17 + tilt, x + 17 + tilt, K);
-    rows(y - 10, x - 22, x + 22, y - 32, x - 16 + tilt, x + 16 + tilt, d.T);
-    rows(y - 10, x - 22, x + 22, y - 14, x - 21, x + 21, '#ffffff');
-    rows(y - 22, x - 19 + tilt, x + 19 + tilt, y - 25, x - 18 + tilt, x + 18 + tilt, d.L);
-    R(x - 23, y - 9, 47, 3, '#9aa3b2'); R(x - 23, y - 9, 47, 1, '#c8ced8');
-    R(x - 17 + tilt, y - 36, 35, 3, '#9aa3b2'); R(x - 3 + tilt, y - 39, 3, 3, Math.floor(T * 8) % 2 ? '#ff4d4d' : '#3d7bff'); R(x + 1 + tilt, y - 39, 3, 3, Math.floor(T * 8) % 2 ? '#3d7bff' : '#ff4d4d');
+    for (const wx of [-16, 16]) { R(x + u(wx) - 1 + tilt, y - u(28), 1, u(6), '#6c7484'); R(x + u(wx) - 2 + tilt, y - u(23), 5, 4, K); }
+    for (const wx of [-20, 20]) { R(x + u(wx), y - u(10), 2, u(8), '#6c7484'); R(x + u(wx) - 2, y - 4, 6, 5, K); R(x + u(wx) - 1, y - 3, 3, 1, '#9aa3b2'); }
+    rows(y - u(9), x - u(23), x + u(23), y - u(33), x - u(17) + tilt, x + u(17) + tilt, K);
+    rows(y - u(10), x - u(22), x + u(22), y - u(32), x - u(16) + tilt, x + u(16) + tilt, d.T);
+    rows(y - u(10), x - u(22), x + u(22), y - u(14), x - u(21), x + u(21), '#ffffff');
+    rows(y - u(22), x - u(19) + tilt, x + u(19) + tilt, y - u(25), x - u(18) + tilt, x + u(18) + tilt, d.L);
+    R(x - u(23), y - u(9), u(46) + 1, 4, '#9aa3b2'); R(x - u(23), y - u(9), u(46) + 1, 1, '#c8ced8');
+    R(x - u(17) + tilt, y - u(36), u(34) + 1, 4, '#9aa3b2'); R(x - 4 + tilt, y - u(39) - 1, 4, 4, Math.floor(T * 8) % 2 ? '#ff4d4d' : '#3d7bff'); R(x + 1 + tilt, y - u(39) - 1, 4, 4, Math.floor(T * 8) % 2 ? '#3d7bff' : '#ff4d4d');
     // the patient sitting up for the ride
-    const img = Sprites.patient(d, jumpH > 0.2 ? 1 : 2, Math.floor(T * 6) % 2, s.laneX > s.lane + 0.05), pw = Math.round(img.width * 1.5), ph = Math.round(img.height * 1.5);
-    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, LW, y - 20); ctx.clip(); ctx.drawImage(img, x - Math.round(pw / 2) + tilt, y - 20 - ph + 12 - (jumpH > 0.3 ? 3 : 0), pw, ph); ctx.restore();
+    const img = Sprites.patient(d, jumpH > 0.2 ? 1 : 2, Math.floor(T * 6) % 2, s.laneX > s.lane + 0.05), pw = Math.round(img.width * 1.8), ph = Math.round(img.height * 1.8);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, LW, y - u(20)); ctx.clip(); ctx.drawImage(img, x - Math.round(pw / 2) + tilt, y - u(20) - ph + u(12) - (jumpH > 0.3 ? 4 : 0), pw, ph); ctx.restore();
     // porter behind, hands on the rail, running
-    const pb = porterBack(s.v > 1 ? Math.floor(T * 12) % 4 : 0), py = fy + 22 - Math.round(lift * 0.85);
-    ctx.drawImage(pb, x - 16, py - 40, 32, 40);
+    const pb = porterBack(s.v > 1 ? Math.floor(T * 12) % 4 : 0), py = fy + u(22) - Math.round(lift * 0.85);
+    ctx.drawImage(pb, x - u(16), py - u(40), u(32), u(40));
     ctx.globalAlpha = 1;
-    if (s.boost > 0) { ctx.globalAlpha = 0.18; ellipse(x, y - 20, 34, 26, Math.floor(T * 8) % 2 ? '#ff4d4d' : '#3d7bff'); ctx.globalAlpha = 1; }
-    if (s.say) { const t = s.say, w = Font.smallWidth(t.text) + 8, bx = Math.max(2, Math.min(LW - w - 2, x - w / 2)), by = y - 66 - Math.round(t.t * 6);
+    if (s.boost > 0) { ctx.globalAlpha = 0.18; ellipse(x, y - u(20), u(34), u(26), Math.floor(T * 8) % 2 ? '#ff4d4d' : '#3d7bff'); ctx.globalAlpha = 1; }
+    if (s.say) { const t = s.say, w = Font.smallWidth(t.text) + 8, bx = Math.max(2, Math.min(LW - w - 2, x - w / 2)), by = y - u(66) - Math.round(t.t * 6);
       badge(Math.round(bx), by, w, 9, '#fff'); R(Math.round(x - 1), by + 9, 3, 2, '#fff'); Font.small(ctx, t.text, Math.round(bx) + 4, by + 2, '#334155'); }
     for (const p of s.pops) { ctx.globalAlpha = 1 - p.t / 0.8; Font.bigCentered(ctx, p.text, Math.round(p.x), Math.round(p.y - p.t * 20), '#ffe066', 1, K); } ctx.globalAlpha = 1;
   }
@@ -356,8 +362,37 @@ const Rush = (() => {
     const lines = Font.wrap('Get the ' + S.patient.name.toLowerCase() + ' patient to the ' + (S.dest === 'OR' ? 'OR' : 'ward') + ', fast. Tap a lane to switch. Tap your own lane to hop over low stuff. Tap TURN when it flashes. Three bumps and you\'re out.', w - 16);
     lines.forEach((l, i) => Font.smallCentered(ctx, l, 97, y + 24 + i * 7, '#475569'));
     Font.smallCentered(ctx, 'NO BUMPS = A FREE BAY NEXT SHIFT', 97, y + h - 52, '#2e8a5f');
-    button('GO GO GO!', 97, y + h - 42, 100, '#22a35a', () => { Sound.sfx.start(); Sound.play('rush'); screen = 'rush'; overlayT = 0; });
+    button('NEXT', 97, y + h - 42, 100, '#22a35a', () => { Sound.sfx.click(); screen = 'rushHow'; overlayT = 0; });
     button('SKIP', 97, y + h - 22, 100, '#64748b', () => { Sound.sfx.click(); finish(false); });
+  }
+  // second page: the actual sprites, so nobody swerves around the coffee
+  function drawHow() {
+    draw(); dim();
+    const w = 184, x = Math.round(97 - w / 2), h = 224, y = Math.max(4, Math.round(LH / 2 - h / 2)) + slideIn();
+    panel(x, y, w, h, '#e8424f');
+    Font.bigCentered(ctx, "WHAT'S WHAT", 97, y + 5, '#fff', 1);
+    ctx.imageSmoothingEnabled = false;
+    const put = (img, cx, by, k, bob) => { const iw = Math.round(img.width * k), ih = Math.round(img.height * k); ctx.drawImage(img, Math.round(cx - iw / 2), by - ih - (bob ? Math.round(Math.sin(T * 5 + cx) * 1.5) : 0), iw, ih); };
+    const glow = (cx, cy) => { ctx.globalAlpha = 0.5; ellipse(cx, cy, 10, 9, '#fff2a8'); ctx.globalAlpha = 1; };
+    const head = (text, yy, bg) => { R(x + 6, yy, w - 12, 10, bg); Font.smallCentered(ctx, text, 97, yy + 2, '#fff'); };
+    const line = (a, b, yy, col) => { Font.small(ctx, a, x + 40, yy, col); if (b) Font.small(ctx, b, x + 40, yy + 7, '#64748b'); };
+    let yy = y + 21;
+    head('GRAB THESE! THEY ARE GOOD!', yy, '#22a35a'); yy += 14;
+    const cardiac = DEPTS[0], others = DEPTS.slice(1, 3);
+    const grab = [
+      [() => put(sprite({ type: 'coffee' }), x + 20, yy + 18, 1, true), 'COFFEE', '+10. CHAIN THEM FOR MORE'],
+      [() => put(Sprites.icon(cardiac), x + 20, yy + 16, 2, true), 'HEART', '+50 AND A LIFE BACK'],
+      [() => { put(Sprites.icon(others[0]), x + 14, yy + 15, 1.5, true); put(Sprites.icon(others[1]), x + 26, yy + 17, 1.5, true); }, 'PATIENT ICONS', '+50 EACH'],
+      [() => put(sprite({ type: 'siren' }), x + 20, yy + 17, 1, true), 'SIREN', 'ZOOM AND SMASH THROUGH'],
+    ];
+    for (const [art_, a, b] of grab) { glow(x + 20, yy + 9); art_(); line(a, b, yy + 3, '#2e8a5f'); yy += 21; }
+    yy += 2; head('HOP OVER: TAP YOUR OWN LANE', yy, '#d99a00'); yy += 13;
+    put(sprite({ type: 'wet' }), x + 13, yy + 20, 0.8); put(sprite({ type: 'bucket' }), x + 29, yy + 20, 0.7);
+    line('WET FLOOR, BUCKETS,', 'ICE CHIPS', yy + 5, '#7a4b00'); yy += 24;
+    head('DODGE: TAP ANOTHER LANE', yy, '#c0392b'); yy += 13;
+    put(sprite({ type: 'cart' }), x + 12, yy + 22, 0.5); put(sprite({ type: 'bed' }), x + 28, yy + 22, 0.62);
+    line('CARTS, BEDS, PEOPLE,', 'VENDING MACHINES', yy + 5, '#b52a3a'); yy += 26;
+    button('GO GO GO!', 97, y + h - 21, 110, '#22a35a', () => { Sound.sfx.start(); Sound.play('rush'); screen = 'rush'; overlayT = 0; });
   }
   function drawEnd() {
     draw(); dim();
@@ -378,7 +413,7 @@ const Rush = (() => {
 
   return {
     begin, tap, update,
-    frame() { if (!S) return; if (screen === 'rushIntro') drawIntro(); else if (screen === 'rushEnd') drawEnd(); else draw(); },
+    frame() { if (!S) return; if (screen === 'rushIntro') drawIntro(); else if (screen === 'rushHow') drawHow(); else if (screen === 'rushEnd') drawEnd(); else draw(); },
     get state() { return S; },
   };
 })();
