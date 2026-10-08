@@ -64,6 +64,8 @@ const Sound = (() => {
               tone({ wave:'triangle', f:mtof(48), f2:mtof(43), at:0.84, dur:0.7, vol:0.25 }); },
     flatline() { tone({ wave:'sine', f:988, at:0, dur:1.4, vol:0.12, attack:0.01 }); },
     quack() { tone({ wave:'pulse12', f:620, f2:430, dur:0.1, vol:0.2 }); tone({ wave:'pulse12', f:600, f2:400, at:0.13, dur:0.12, vol:0.2 }); },
+    blip(f) { tone({ wave:'pulse25', f, dur:0.035, vol:0.07 }); },
+    boing() { tone({ wave:'sine', f:220, f2:660, dur:0.16, vol:0.22 }); },
     start() { [64, 67, 72].forEach((m, i) => tone({ wave:'pulse25', f:mtof(m), at:i * 0.07, dur:0.1, vol:0.16 })); },
   };
 

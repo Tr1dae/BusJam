@@ -139,6 +139,52 @@ function patientGrid(dept, frame, flick) {
   return grid(head.concat(body, LEGS[frame]));
 }
 
+// ---------- staff cameos: a nurse in green scrubs and a doctor in a lab coat ----------
+const NURSE = [
+  '....kkkkk.....',
+  '...khhhhhk....',
+  '.kkhhhhhhhk...',
+  'khkHhhhsssk...',
+  'khkHhhsskssk..',
+  '.kkHHsssssk...',
+  '...kHssspsk...',
+  '....kkssskk...',
+  '...kTsssTk....',
+  '..kTTLsTTTk...',
+  '.kTTLTTTTTkkk.',
+  '.kTTLTTTskwwk.',
+  '.ksTTTTTskwgk.',
+  '.kSsTTTTTkwwk.',
+  '.kSsTTTTtkkkk.',
+  '..kTTTTttk....',
+  '...kkkkkk.....',
+];
+const DOCTOR = [
+  '....kkkkk.....',
+  '...kHHHkkk....',
+  '..kHHHkzwzk...',
+  '..kHHhkzzzk...',
+  '..kHhhsskssk..',
+  '..kHHsssssk...',
+  '...kHsssssk...',
+  '....kkssskk...',
+  '...kwBrBwk....',
+  '..kwWgrgWwk...',
+  '.kwwWgrgwWk...',
+  '.kwWwgBgwskkk.',
+  '.ksWwwgwkwwwk.',
+  '.kSWwwwwkbbbk.',
+  '.kSWwwwwwkbbk.',
+  '..kwwwwWWkkk..',
+  '..kwwwwwWWk...',
+  '..kkkkkkkkk...',
+];
+const STAFF_LEGS = {
+  nurse: LEGS.map(f => f.map(r => r.replace(/s/g, 't'))),
+  doctor: LEGS.map(f => f.map(r => r.replace(/s/g, 'o').replace(/W/g, 'c'))),
+};
+const SCRUBS = { T:'#3fae7a', t:'#2e8a5f', L:'#7fd6a6' };
+
 // ---------- vehicles: shapes rasterised per angle (clean 45° staircases) ----------
 const AMB_W = 12, CART_W = 10;
 function ambRegion(u, v, len) {
@@ -232,6 +278,11 @@ const Sprites = (() => {
     },
     patient(dept, frame, flick, flip) {
       return get(`p|${dept.name}|${frame}|${flick ? 1 : 0}|${flip ? 1 : 0}`, () => toCanvas(patientGrid(dept.name, frame, flick), patientTint(dept), flip));
+    },
+    // kind 'nurse' | 'doctor'; hair is [main, shade]
+    staff(kind, hair, frame, flip) {
+      return get(`st|${kind}|${hair}|${frame}|${flip ? 1 : 0}`, () => toCanvas(grid((kind === 'nurse' ? NURSE : DOCTOR).concat(STAFF_LEGS[kind][frame])),
+        { ...SCRUBS, h:hair[0], H:hair[1] }, flip));
     },
     icon(dept) { return get(`i|${dept.name}`, () => toCanvas(grid(ICONS[dept.name]), { w:dept.L, k:dept.D })); },
     DIRS,

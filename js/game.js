@@ -84,11 +84,132 @@ const BLURBS = [
 const WIN_LINES = ["They'll be back.", 'Beds are clean. For eleven minutes.', 'Handover done. Not your problem anymore.', "Everyone's where they belong. Suspicious."];
 const LOSE_LINES = ['Somebody page the charge nurse.', "Time for a coffee you won't finish.", 'Code Brown in the parking lot.'];
 const INTROS = {
-  1: 'Tap an ambulance to drive it out. Patients board the ambulance for their department. Full ones leave. Clear the lot! Locked bays open for 500 points each. Tap the sign to see who's who.',
+  1: "Tap an ambulance to drive it out. Patients board the ambulance for their department. Full ones leave. Clear the lot! Locked bays open for 500 points each. Tap the sign to see who's who.",
   3: 'New: triage pending. Grey ambulances hide their department until the road ahead is clear.',
   5: 'New: flip-floppers. Ambulances with the yellow arrows turn around every time you send another one off.',
   7: 'New: code blue! The crash cart has to leave before its counter hits zero. Every move counts.',
 };
+
+// ---------- staff cameos ----------
+// one of Becca's friends drops by once a shift; now and then a doctor pops up too
+const NURSES = ['Becca', 'Sarah', 'Jess', 'Carly', 'Katrina', 'Jann', 'Angela'];
+const HAIR = { Becca: ['#4f3322', '#38231a'], Sarah: ['#f0c75e', '#c99a32'], Jess: ['#7a4a2a', '#5c3620'], Carly: ['#b5532e', '#843a1f'],
+  Katrina: ['#3a2f3a', '#241c26'], Jann: ['#a8743f', '#7d5329'], Angela: ['#d98a4e', '#a8643a'] };
+const NURSE_LINES = [
+  "Bed 4 wants a sandwich. Bed 4 is nil by mouth. Bed 4 is furious.",
+  "Someone googled their symptoms. They're dying of everything.",
+  "Three coffees, no lunch, one working pen. Living the dream.",
+  "Doctor wrote 'patient fine'. Patient is not fine.",
+  "Patient says the pain is 10 out of 10. Patient is eating Doritos.",
+  "Whatever you do, don't say the Q word. You know the one.",
+  "A visitor asked if I'm a real nurse. No, I'm three raccoons in scrubs.",
+  "Hour eleven of not going to the bathroom. Personal best.",
+  "Who keeps stealing the good pens? I will find you.",
+  "Patient pulled out their IV again. It's a hobby at this point.",
+  "'Just one quick question,' says the man holding a list.",
+  "My feet stopped speaking to me around hour nine.",
+  "Somebody microwaved fish in the break room. Again.",
+  "Pharmacy says 'soon'. Pharmacy has said 'soon' since Tuesday.",
+  "Room 6 rang the call bell for the TV remote. It was in their hand.",
+  "Lunch? I've heard of it. Sounds nice.",
+  "Allergic to every painkiller except the strong one. Classic.",
+  "Full moon tonight. Everybody brace.",
+];
+const DOCTOR_LINES = [
+  "Has anyone seen my stethoscope? ...Oh. It's on me.",
+  "Can someone redo all the vitals? I lost the paper.",
+  "Why is this patient on oxygen? Let's try air.",
+  "Quick one: is the heart on the left or the right?",
+  "I'll be in surgery. By surgery I mean the cafeteria.",
+  "Can we discharge everyone? I've got a tee time.",
+  "Page me if anything happens. I'll be unreachable.",
+  "Let's just order every test. All of them. Twice.",
+  "I wrote the orders. In pencil. On a napkin. Somewhere.",
+  "My handwriting? It's a font. Look it up.",
+  "Bed 2 is in pain? Have we tried asking them to stop?",
+  "Could someone call the family? And my mum? She worries.",
+];
+function nextNurse() {
+  // shuffle bag so everyone gets a turn before anyone repeats
+  let bag = []; try { bag = JSON.parse(localStorage.getItem('aj.nurses') || '[]').filter(n => NURSES.includes(n)); } catch (e) {}
+  if (!bag.length) bag = NURSES.slice().sort(() => Math.random() - 0.5);
+  const name = bag.shift(); try { localStorage.setItem('aj.nurses', JSON.stringify(bag)); } catch (e) {}
+  return name;
+}
+function scheduleCameos() {
+  const t = 8 + Math.random() * 30, list = [{ kind: 'nurse', at: t }];
+  if (Math.random() < 0.3) list.push({ kind: 'doctor', at: Math.random() < 0.5 ? Math.max(5, t - 15 - Math.random() * 10) : t + 15 + Math.random() * 15 });
+  return list;
+}
+function startCameo(c) {
+  const nurse = c.kind === 'nurse', name = nurse ? nextNurse() : 'Doctor';
+  G.cameo = { kind: c.kind, name, hair: nurse ? HAIR[name] : ['#4f3322', '#38231a'], text: pick(nurse ? NURSE_LINES : DOCTOR_LINES), t: 0, phase: 'in', typed: 0, blip: 0 };
+  if (!nurse) Sound.sfx.boing();
+}
+const CAMEO_IN = 1.1;
+function updateCameo(dt) {
+  G.playT += dt;
+  if (!G.cameo && !G.over) { const i = G.cameos.findIndex(c => G.playT >= c.at); if (i >= 0) startCameo(G.cameos.splice(i, 1)[0]); }
+  const c = G.cameo; if (!c) return;
+  c.t += dt;
+  if (c.phase === 'in' && c.t >= (c.kind === 'nurse' ? CAMEO_IN : 0.35)) { c.phase = 'talk'; c.t = 0; }
+  else if (c.phase === 'talk') {
+    const before = Math.floor(c.typed); c.typed = Math.min(c.text.length, c.typed + dt * 32);
+    if (Math.floor(c.typed) > before && Math.floor(c.typed) % 3 === 0 && c.typed < c.text.length) Sound.sfx.blip((c.kind === 'nurse' ? 700 : 330) + Math.random() * 120);
+    if (c.t > 2.6 + c.text.length / 32 + 1.6) cameoLeave();
+  } else if (c.phase === 'out' && c.t >= (c.kind === 'nurse' ? CAMEO_IN : 0.35)) G.cameo = null;
+}
+function cameoLeave() { const c = G.cameo; if (c && c.phase !== 'out') { c.phase = 'out'; c.t = 0; } }
+// where the cameo stands, and the speech bubble beside them
+function cameoLayout() {
+  const c = G.cameo, nurse = c.kind === 'nurse', S = 2, w = 14 * S, h = (nurse ? 20 : 21) * S, feet = LH - 14;
+  let x = nurse ? 6 : LW - 6 - w, y = feet - h, flip = !nurse, frame = 0;
+  if (nurse) {
+    const walking = c.phase !== 'talk', u = Math.min(1, c.t / CAMEO_IN);
+    if (c.phase === 'in') x = Math.round(lerp(-w - 4, 6, ease(u)));
+    if (c.phase === 'out') { x = Math.round(lerp(6, -w - 4, ease(u))); flip = true; }
+    if (walking) frame = Math.floor(T * 8) % 4;
+  } else {
+    const u = Math.min(1, c.t / 0.35), c1 = 1.70158, back = 1 + (c1 + 1) * Math.pow(u - 1, 3) + c1 * Math.pow(u - 1, 2);
+    if (c.phase === 'in') y = Math.round(feet - h * back);
+    if (c.phase === 'out') y = Math.round(lerp(feet - h, LH + 2, u * u));
+  }
+  const lines = Font.wrap(c.text, 104), bw = 112, bh = lines.length * 7 + 6;
+  const bx = nurse ? x + w + 6 : x - bw - 6, by = Math.min(feet - h - 2, feet - 20 - bh);
+  return { x, y, w, h, flip, frame, S, feet, lines, bx, by, bw, bh };
+}
+function drawCameo() {
+  const c = G.cameo; if (!c) return;
+  const L = cameoLayout(), img = Sprites.staff(c.kind, c.hair, L.frame, L.flip);
+  ellipse(L.x + L.w / 2, L.feet + 1, 11, 2, 'rgba(20,24,36,.3)');
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, LW, L.feet + 3); ctx.clip();
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(img, L.x, L.y + (c.phase === 'talk' && Math.floor(T * 3) % 2 ? 1 : 0), L.w, L.h); ctx.restore();
+  // name tag: an ID badge under their feet
+  const label = c.kind === 'nurse' ? c.name + ' RN' : 'DOCTOR', tw = Font.smallWidth(label) + 9, tx = Math.round(L.x + L.w / 2 - tw / 2), ty = L.feet + 4;
+  if (c.phase !== 'in' || c.kind === 'nurse') {
+    R(tx - 1, ty - 1, tw + 2, 9, K); R(tx, ty, tw, 7, '#fff'); R(tx, ty, 3, 7, c.kind === 'nurse' ? '#3fae7a' : '#3d7bff');
+    Font.small(ctx, label, tx + 5, ty + 1, K);
+  }
+  if (c.phase !== 'talk') return;
+  // speech bubble with a typewriter reveal
+  const { bx, by, bw, bh, lines } = L, pop = Math.min(1, c.t / 0.12);
+  if (pop < 1) { const cx = bx + bw / 2, cy = by + bh / 2; R(Math.round(cx - bw * pop / 2), Math.round(cy - bh * pop / 2), Math.round(bw * pop), Math.round(bh * pop), '#fff'); return; }
+  R(bx + 1, by - 1, bw - 2, bh + 2, K); R(bx - 1, by + 1, bw + 2, bh - 2, K); R(bx, by, bw, bh, '#fff');
+  R(bx + 1, by + bh, bw - 2, 1, 'rgba(20,24,36,.25)');
+  const tailY = by + bh - 6, tx0 = c.kind === 'nurse' ? bx - 1 : bx + bw + 1, d = c.kind === 'nurse' ? -1 : 1;
+  for (let k = 0; k < 4; k++) { R(tx0 + d * k, tailY + k, 1, 4 - k, '#fff'); R(tx0 + d * (k + 1), tailY + k, 1, 1, K); }
+  R(tx0 + d * 4, tailY + 4, 1, 1, K);
+  let left = Math.floor(c.typed);
+  lines.forEach((ln, i) => { if (left <= 0) return; Font.small(ctx, ln.slice(0, left), bx + 4, by + 4 + i * 7, '#334155'); left -= ln.length + 1; });
+}
+function cameoTap(p) {
+  const c = G && G.cameo; if (!c) return false;
+  const L = cameoLayout(), inBubble = c.phase === 'talk' && p.x >= L.bx - 4 && p.x <= L.bx + L.bw + 4 && p.y >= L.by - 2 && p.y <= L.by + L.bh + 2;
+  const onThem = p.x >= L.x && p.x <= L.x + L.w && p.y >= L.y && p.y <= L.feet + 12;
+  if (!inBubble && !onThem) return false;
+  if (c.typed < c.text.length) c.typed = c.text.length; else cameoLeave();
+  Sound.sfx.click(); return true;
+}
 
 // ---------- state ----------
 let screen = 'splash', G = null, T = 0, toast = null, buttons = [], overlayT = 0;
@@ -99,7 +220,7 @@ function startLevel(n) {
   level = n; try { localStorage.setItem('aj.level', n); } catch (e) {}
   const gen = generateLevel(n, LOT);
   G = { n, cfg: gen.cfg, vehicles: gen.vehicles, offset: 0, rows: [], funnels: [], bays: [], open: OPEN, score: 0, shown: 0, floats: [], bonus: 0,
-        flyers: [], pops: [], over: null, moves: 0, blurb: pick(BLURBS), endLine: '' };
+        flyers: [], pops: [], over: null, moves: 0, blurb: pick(BLURBS), endLine: '', playT: 0, cameos: scheduleCameos(), cameo: null };
   for (const v of G.vehicles) { v.state = 'lot'; v.px = v.x; v.py = v.y; v.revealed = !v.mystery; v.bumpT = 0; v.shake = 0; v.flipAnim = 0; }
   for (let i = 0; i < SLOTS; i++) G.bays.push({ state: 'empty', t: 0 });
   // fill loop rows in the order they will reach the door, the rest wait in the funnels
@@ -197,6 +318,7 @@ function update(dt) {
     G.floats.forEach(f => { f.t += dt; f.y -= 14 * dt; }); G.floats = G.floats.filter(f => f.t < 1.4); }
   updateFx(dt);
   if (!G || screen !== 'play') return;
+  updateCameo(dt);
   for (const v of G.vehicles) {
     if ((v.state === 'exit' || v.state === 'route') && (v.puffT = (v.puffT || 0) - dt) <= 0) { v.puffT = 0.05; rearPuff(v, 1); }
     if (v.shake > 0) v.shake = Math.max(0, v.shake - dt);
@@ -615,6 +737,7 @@ function drawPlay() {
   drawFx();
   for (const p of G.pops) { ctx.globalAlpha = p.t < 0.7 ? 1 : Math.max(0, 1 - (p.t - 0.7) / 0.2); blit(Sprites.icon(p.dept), p.x, p.y); ctx.globalAlpha = 1; }
   for (const f of G.floats) { ctx.globalAlpha = f.t < 1 ? 1 : Math.max(0, 1 - (f.t - 1) / 0.4); Font.bigCentered(ctx, f.text, Math.round(f.x), Math.round(f.y), f.col, 1, K); ctx.globalAlpha = 1; }
+  drawCameo();
   drawHud();
   if (toast && toast.t > 0) { const w = Font.smallWidth(toast.msg) + 10; badge(Math.round(97 - w / 2), BAY_Y + BAY_H + 10, w, 11, '#334155'); Font.small(ctx, toast.msg, Math.round(97 - w / 2) + 5, BAY_Y + BAY_H + 13, '#fff'); }
 }
@@ -731,6 +854,7 @@ cv.addEventListener('pointerdown', e => {
   Sound.init();
   for (const b of buttons) if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { b.fn(); return; }
   if (screen !== 'play' || G.over) return;
+  if (cameoTap(p)) return;
   if (p.y < LOT_TOP - 4) taps.push({ x: p.x, y: p.y, t: 0 });
   if (inPond(p.x, p.y)) { duckHop = T; Sound.sfx.quack(); G.floats.push({ text: 'QUACK!', x: PARK.pond.x + 6, y: PARK.pond.y - 18, t: 0.3, col: '#fff' }); return; }
   let best = null, bd = Infinity;
