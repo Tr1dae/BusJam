@@ -441,32 +441,61 @@ const Minis = (() => {
     ['I SURVIVED', 'THE FULL', 'MOON', '#1f2a44', '#ffe066'], ['HYDRATE', 'OR', 'DIEDRATE', '#cfe9f7', '#1f4e9c'], ['TRUST ME', "I'M A", 'NURSE', '#fff', '#3fae7a'],
     ['THIS IS', 'MY BREAK', '(5 MIN)', '#ffe1c4', '#a8643a'], ['DECAF?', 'IN THIS', 'ECONOMY?', '#efe4ff', '#6b4ea0'], ['MY BLOOD', 'TYPE IS', 'COFFEE', '#e8424f', '#fff'],
     ["DON'T", 'TALK TO ME', 'YET', '#3b4252', '#e9edf2'], ['SHIFT', 'HAPPENS', '', '#ffd23f', '#2b3446'], ['BEST NURSE', 'ACCORDING', 'TO MY CAT', '#ffd6e8', '#b5427e']];
+  // ---- coffee for the unit: fill orders of sugar, milk and coffee before the break ends ----
+  const NUM = ['NO', 'ONE', 'TWO', 'THREE', 'FOUR'];
+  const COFFEE_EXTRA = ['THE USUAL.', 'PLEASE. I BEG.', 'SURVIVAL MODE.', 'BEFORE ROUNDS, PLEASE.', 'DO NOT JUDGE ME.', 'HURRY. CODE SOON.', 'I HAVE BEEN AWAKE SINCE TUESDAY.',
+    'DOCTOR TOOK MY LAST ONE.', 'FOR MORALE.', 'MEDICINAL PURPOSES.', 'IT IS ONLY 3 AM.', 'STRONG ENOUGH TO CHART.'];
+  const COFFEE_YES = ['BLESS YOU.', 'YOU MAY LIVE.', 'NOW I CAN FEEL MY FACE.', 'FINALLY. A COMPETENT ADULT.', 'BEST THING ALL SHIFT.', 'I WOULD DIE FOR YOU. NOT TODAY.'];
+  const COFFEE_NO = ['THIS IS NOT MY ORDER.', 'DID THE DOCTOR MAKE THIS?', 'I SAID WHAT I SAID.', 'INCIDENT REPORT.', 'THIS TASTES LIKE NIGHT SHIFT.', 'WRONG. LIKE MY LIFE CHOICES.'];
+  const coffeeOrder = () => {
+    const milk = one([0, 0, 1, 1, 2, 2, 3]), sugar = one([0, 0, 1, 2, 2, 3]), cof = 4 - milk;
+    const sug = sugar === 0 ? 'NO SUGAR' : NUM[sugar] + ' SUGAR' + (sugar > 1 ? 'S' : '');
+    const text = milk === 0 ? (sugar === 0 ? 'BLACK. ALL COFFEE.' : sug + ', ALL COFFEE.') : sug + ', ' + NUM[milk] + ' MILK, ' + NUM[cof] + ' COFFEE.';
+    return { sugar, milk, cof, text, who: one(NURSES), extra: one(COFFEE_EXTRA), mug: one(MUGS) };
+  };
+  const COFFEE_W = 50, COFFEE_H = 76, POUR_T = 0.35;
+  const coffeeCup = () => { const ct = Math.round(LH * 0.66); return { ct, cy: ct - 8 - COFFEE_H, ph: Math.floor((COFFEE_H - 4) / 4) }; };
+  const coffeeBtns = () => { const y = LH - 40, w = 58; return [{ id: 'cof', x: 6, y, w, h: 32, label: 'COFFEE', col: '#7a4a2c', hi: '#a8714a' }, { id: 'milk', x: 69, y, w, h: 32, label: 'MILK', col: '#5b8def', hi: '#8ab0ff' }, { id: 'serve', x: 132, y, w, h: 32, label: 'SERVE', col: '#22a35a', hi: '#4fd38a' }]; };
   const coffee = {
-    title: 'COFFEE BREAK!', head: '#8a5a33', song: 'break', isBreak: true,
-    blurb: 'Hold to pour. Let go right on the line. Three cups before your break ends.',
-    rows: [[(x, y) => { R(x - 7, y - 6, 14, 14, K); R(x - 6, y - 5, 12, 12, '#fff'); R(x - 6, y + 1, 12, 6, '#6b3f22'); R(x - 8, y - 1, 16, 1, '#e8424f'); }, 'STOP ON THE RED LINE', 'OVERFILL AND IT IS A CODE BROWN', '#8a5a33']],
-    init(m) { m.dur = 15; m.cups = MUGS.slice().sort(() => Math.random() - 0.5).slice(0, 3).map((g, i) => ({ g, line: rnd(0.5, 0.86), rate: 0.34 + i * 0.1 + m.shift * 0.005 })); m.cup = 0; m.level = 0; m.state = 'in'; m.st = 0; m.pourT = 0; m.spill = 0; m.grade = ''; },
+    title: 'COFFEE RUN!', head: '#8a5a33', song: 'break', isBreak: true,
+    blurb: 'The unit wants coffee, and they are specific. Tap the sugar bowl for cubes, pour coffee and milk with the buttons, then serve. Four parts fill a mug.',
+    rows: [
+      [(x, y) => { R(x - 8, y - 2, 16, 8, K); R(x - 7, y - 1, 14, 6, '#fff'); R(x - 7, y - 1, 14, 2, '#5b8def'); for (const dx of [-5, -1, 3]) { R(x + dx, y - 6, 4, 4, K); R(x + dx + 1, y - 5, 2, 2, '#fff'); } }, 'TAP THE BOWL FOR SUGAR', 'ONE CUBE PER TAP', '#8a5a33'],
+      [(x, y) => { R(x - 6, y - 7, 12, 15, K); R(x - 5, y - 6, 10, 13, '#dceff5'); R(x - 5, y + 1, 10, 6, '#5a3520'); R(x - 5, y - 3, 10, 4, '#f4ead8'); }, 'COFFEE + MILK = FOUR PARTS', 'POUR WITH THE BUTTONS BELOW', '#6b3f22'],
+      [(x, y) => { R(x - 8, y - 5, 16, 11, K); R(x - 7, y - 4, 14, 9, '#22a35a'); R(x - 4, y, 2, 2, '#fff'); R(x - 2, y + 2, 2, 1, '#fff'); R(x, y - 1, 2, 3, '#fff'); R(x + 2, y - 3, 2, 2, '#fff'); }, 'SERVE IT WHEN IT MATCHES', 'AS MANY AS YOU CAN IN 60S', '#2e8a5f'],
+    ],
+    breakLine: m => 'ORDERS SERVED ' + m.served + (m.wrong ? '   WRONG ' + m.wrong : ''),
+    init(m) { m.dur = 60; m.served = 0; m.wrong = 0; m.combo = 0; m.done_ = []; m.bowl = 0; m.say = null; coffee.next(m); },
+    next(m) { m.order = coffeeOrder(); m.parts = []; m.sugar = 0; m.pour = null; m.state = 'in'; m.st = 0; m.cubes = []; m.press = null; m.spill = 0; m.full = 0; },
     update(m, dt) {
-      m.st += dt; m.spill = Math.max(0, m.spill - dt);
-      const c = m.cups[m.cup];
-      if (m.state === 'in' && m.st > 0.35) { m.state = 'ready'; m.st = 0; }
-      if (m.state === 'pour') { m.pourT += dt; m.level += c.rate * (1 + m.pourT * 0.5) * dt; if (Math.floor(m.pourT * 10) !== Math.floor((m.pourT - dt) * 10)) Sound.sfx.pour();
-        if (m.level >= 1.04) { m.level = 1.04; m.spill = 0.8; coffee.grade(m); } }
-      if (m.state === 'graded' && m.st > 0.8) { m.state = 'out'; m.st = 0; }
-      if (m.state === 'out' && m.st > 0.35) { m.cup++; m.level = 0; m.pourT = 0; m.st = 0; m.state = 'in'; if (m.cup >= m.cups.length) end(m, 'win'); }
+      m.st += dt; m.bowl = Math.max(0, m.bowl - dt * 5); m.spill = Math.max(0, m.spill - dt); if (m.say) { m.say.t += dt; if (m.say.t > 1.4) m.say = null; }
+      if (m.state === 'in' && m.st > 0.3) { m.state = 'ready'; m.st = 0; }
+      if (m.pour) { m.pour.t += dt; if (m.pour.t >= POUR_T) { m.parts.push(m.pour.kind); m.pour = null;
+        if (m.parts.length === 4) { m.full = 1; Sound.sfx.ding(); }
+        if (m.parts.length > 4) { m.say = { text: 'CODE BROWN!', ok: false, t: 0 }; Sound.sfx.slip(); shakeScreen(0.2, 1.5); buzz(50); m.wrong++; m.combo = 0; m.state = 'out'; m.st = 0; m.spill = 1; } } }
+      m.cubes.forEach(c => c.t += dt);
+      if (m.press) { m.press.t += dt; if (m.press.t > 0.15) m.press = null; }
+      if (m.state === 'out' && m.st > 0.45) coffee.next(m);
       if (m.t >= m.dur && !m.done) end(m, 'win');
     },
-    grade(m) {
-      const c = m.cups[m.cup], d = m.level - c.line; let pts, msg, col = '#ffe066';
-      if (m.level > 1) { pts = 0; msg = 'CODE BROWN!'; col = '#ff8a8f'; Sound.sfx.slip(); shakeScreen(0.2, 1.5); }
-      else if (Math.abs(d) <= 0.035) { pts = 150; msg = 'PERFECT!'; Sound.sfx.bonus(); sparkle(97, Math.round(LH * 0.66) - 40, 12, ['#ffe066', '#fff']); }
-      else if (Math.abs(d) <= 0.09) { pts = 80; msg = 'GOOD'; Sound.sfx.ding(); }
-      else if (d < 0) { pts = 20; msg = 'WEAK'; col = '#e2e8f0'; Sound.sfx.nope(); }
-      else { pts = 30; msg = 'TOO MUCH'; col = '#e2e8f0'; Sound.sfx.nope(); }
-      m.score += pts; pop(msg + (pts ? ' +' + pts : ''), 97, Math.round(LH * 0.66) - 186, col); m.state = 'graded'; m.st = 0;
+    serve(m) {
+      const o = m.order, c = m.parts.filter(k => k === 'cof').length, mk = m.parts.filter(k => k === 'milk').length, { cy } = coffeeCup();
+      if (c === o.cof && mk === o.milk && m.sugar === o.sugar) {
+        m.combo++; const pts = 60 + Math.min(m.combo - 1, 5) * 10; m.score += pts; m.served++; m.done_.push(o.mug);
+        pop('+' + pts + (m.combo > 1 ? '  X' + m.combo : ''), 97, cy - 12, '#ffe066'); m.say = { text: one(COFFEE_YES), ok: true, t: 0 };
+        Sound.sfx.bonus(); sparkle(97, cy + 20, 12, ['#ffe066', '#fff']);
+      } else { m.wrong++; m.combo = 0; m.say = { text: m.parts.length < 4 ? 'HALF A CUP? REALLY?' : one(COFFEE_NO), ok: false, t: 0 }; Sound.sfx.nope(); buzz(40); shakeScreen(0.12, 1); }
+      m.state = 'out'; m.st = 0;
     },
-    down(m) { if (m.state === 'ready') { m.state = 'pour'; m.pourT = 0; } },
-    up(m) { if (m.state === 'pour') coffee.grade(m); },
+    down(m, p) {
+      if (m.state !== 'ready' || m.pour) return;
+      const { ct } = coffeeCup();
+      if (p.x < 46 && p.y > ct - 44 && p.y < ct + 8) { if (m.sugar >= 6) return; m.sugar++; m.bowl = 1; m.cubes.push({ t: 0, x: 28 + (m.sugar % 3) * 5 }); Sound.sfx.blip(900 + m.sugar * 80); return; }
+      for (const b of coffeeBtns()) if (p.x >= b.x - 2 && p.x < b.x + b.w + 2 && p.y >= b.y - 6 && p.y < b.y + b.h + 4) {
+        m.press = { id: b.id, t: 0 };
+        if (b.id === 'serve') coffee.serve(m); else { m.pour = { kind: b.id, t: 0 }; Sound.sfx.pour(); }
+        return; }
+    },
     paintBg(g) {
       const ct = Math.round(LH * 0.66), mx = 44, mw = 108, my = ct - 172, cb = Math.max(46, Math.min(my - 8, 70));
       // subway tile backsplash
@@ -494,51 +523,90 @@ const Minis = (() => {
         R(x, dt, 45, LH - dt - 8, '#6e4527', g); R(x + 1, dt + 1, 43, LH - dt - 10, '#8a5a33', g); R(x + 5, dt + 5, 35, LH - dt - 18, '#7a4e2b', g); R(x + 5, dt + 5, 35, 1, '#9c6a3e', g);
         R(i % 2 ? x + 4 : x + 38, dt + 4, 3, 6, '#e9edf2', g); }
       R(0, LH - 6, LW, 6, '#3e2614', g);
-      // the bin, full of other people's cups
-      const tx = 150, ty = LH - 44;
-      R(tx + 4, ty - 10, 8, 12, K, g); R(tx + 5, ty - 9, 6, 10, '#fff', g); R(tx + 18, ty - 8, 9, 10, K, g); R(tx + 19, ty - 7, 7, 8, '#e8424f', g); R(tx + 24, ty - 12, 6, 12, K, g); R(tx + 25, ty - 11, 4, 10, '#f4f6f9', g);
-      R(tx - 1, ty - 1, 34, 41, K, g); R(tx, ty, 32, 39, '#6c7484', g); R(tx, ty, 32, 3, '#9aa3b2', g); for (let x = tx + 5; x < tx + 30; x += 6) R(x, ty + 6, 2, 30, '#5b6270', g);
+      // a steel tray for the mugs already served
+      R(2, LH - 47, LW - 4, 4, K, g); R(3, LH - 47, LW - 6, 2, '#dfe5ec', g); R(3, LH - 45, LW - 6, 1, '#9aa3b2', g); R(5, LH - 43, 3, 2, K, g); R(LW - 8, LH - 43, 3, 2, K, g);
       // the machine
       R(mx - 1, my - 1, mw + 2, 174, K, g); R(mx, my, mw, 172, '#3b4252', g); R(mx, my, 6, 172, '#2b3446', g); R(mx + mw - 6, my, 6, 172, '#2b3446', g);
       R(mx, my, mw, 4, '#9aa3b2', g); R(mx, my, mw, 1, '#dfe5ec', g); R(mx + 6, my + 6, mw - 12, 26, '#55607a', g); R(mx + 6, my + 8, mw - 12, 22, '#14202e', g);
-      R(mx + 6, my + 36, mw - 12, 4, '#2b3446', g); R(mx + 45, my + 40, 18, 10, '#2b3446', g); R(mx + 51, my + 50, 6, 4, '#9aa3b2', g);
+      R(mx + 6, my + 36, mw - 12, 4, '#2b3446', g); R(mx + 40, my + 40, 28, 10, '#2b3446', g); R(mx + 45, my + 50, 5, 4, '#9aa3b2', g); R(mx + 58, my + 50, 5, 4, '#9aa3b2', g); R(mx + 46, my + 44, 3, 3, '#8a5a33', g); R(mx + 59, my + 44, 3, 3, '#f4ead8', g);
       Font.smallCentered(g, 'BREW-O-MATIC 3000', 97, my + 58, '#9aa3b2');
       [['#e8424f', 76], ['#3ddc84', 90], ['#9aa3b2', 104]].forEach(([c, y]) => { disc(mx + 15, my + y, 4, K, g); disc(mx + 15, my + y, 3, c, g); disc(mx + mw - 16, my + y, 4, K, g); disc(mx + mw - 16, my + y, 3, '#9aa3b2', g); });
       R(mx + 4, ct - 8, mw - 8, 8, '#2b3446', g); for (let x = mx + 8; x < mx + mw - 8; x += 4) R(x, ct - 7, 2, 1, '#55607a', g);
       // sugar jar and a box of very old donuts
-      R(13, ct - 19, 20, 19, K, g); R(14, ct - 18, 18, 18, '#d6ecff', g); R(15, ct - 9, 16, 8, '#fff', g); R(12, ct - 22, 22, 4, K, g); R(13, ct - 21, 20, 2, '#e8424f', g); R(15, ct - 16, 2, 6, '#ffffffaa', g);
       R(160, ct - 12, 30, 12, K, g); R(161, ct - 11, 28, 10, '#ff7eb6', g); R(158, ct - 22, 34, 11, K, g); R(159, ct - 21, 32, 9, '#ffb3d1', g); R(165, ct - 18, 20, 3, '#fff', g);
       disc(168, ct - 6, 3, '#d9a05b', g); disc(181, ct - 6, 3, '#d9a05b', g); R(168, ct - 6, 1, 1, '#ff7eb6', g); R(181, ct - 6, 1, 1, '#ff7eb6', g);
-      Font.small(g, 'SUGAR', 13, ct - 30, '#8a5a33'); Font.small(g, '2019', 167, ct - 30, '#8a5a33');
+       Font.small(g, '2019', 167, ct - 30, '#8a5a33');
     },
     draw(m) {
-      const ct = Math.round(LH * 0.66), mx = 44, mw = 108, my = ct - 172;
+      const mx = 44, mw = 108, o = m.order, { ct, cy, ph } = coffeeCup(), my = ct - 172, cw = COFFEE_W, chh = COFFEE_H;
       bgLayer('coffee', g => coffee.paintBg(g));
-      Font.small(ctx, m.state === 'pour' ? 'BREWING...' : 'READY', mx + 12, my + 16, '#3ddc84'); R(mx + mw - 16, my + 15, 5, 5, Math.floor(T * 3) % 2 ? '#ff4d4d' : '#7a1f1f');
-      // the cup slides in, gets poured, slides out
-      const c = m.cups[Math.min(m.cup, m.cups.length - 1)], slide = m.state === 'in' ? (1 - Math.min(1, m.st / 0.35)) * 140 : m.state === 'out' ? -Math.min(1, m.st / 0.35) * 140 : 0;
-      const cw = 50, chh = 58, cx = Math.round(97 - cw / 2 + slide), cy = ct - 8 - chh;
-      if (m.state === 'pour') { const top = cy + Math.round(chh * (1 - Math.min(1, m.level))); R(95, my + 54, 3, top - my - 54, '#6b3f22'); R(96, my + 54, 1, top - my - 54, '#8a5a33'); }
-      R(cx + cw, cy + 10, 12, 30, K); R(cx + cw, cy + 11, 11, 28, c.g[3]); R(cx + cw, cy + 15, 7, 20, K); R(cx + cw, cy + 16, 6, 18, '#e3d8c2');
-      R(cx - 1, cy - 1, cw + 2, chh + 2, K); R(cx, cy, cw, chh, c.g[3]); R(cx, cy + chh - 3, cw, 3, '#00000022'); R(cx + 3, cy + 4, 2, chh - 10, '#ffffff55');
-      R(cx - 1, cy + chh - 1, 2, 2, K); R(cx + cw - 1, cy + chh - 1, 2, 2, K);
-      const lv = Math.min(1, m.level), fh = Math.round((chh - 4) * lv);
-      if (fh > 0) { R(cx + 2, cy + chh - 2 - fh, cw - 4, fh, '#6b3f22'); R(cx + 2, cy + chh - 2 - fh, cw - 4, 2, '#b5835a'); }
-      // fill line
-      const ly = cy + 2 + Math.round((chh - 4) * (1 - c.line));
-      for (let x = cx - 4; x < cx + cw + 4; x += 4) R(x, ly, 2, 1, '#e8424f'); R(cx - 6, ly - 2, 3, 5, '#e8424f'); R(cx + cw + 3, ly - 2, 3, 5, '#e8424f');
-      // mug slogan under the coffee line, so it shows through
-      c.g.slice(0, 3).forEach((t, i) => t && Font.smallCentered(ctx, t, cx + cw / 2, cy + 10 + i * 8, c.g[4]));
-      if (m.spill > 0) { for (let i = 0; i < 10; i++) R(cx - 10 + i * 6, ct - 2 + (i % 3), 5, 2, '#6b3f22'); }
-      if (m.state === 'graded' && m.level <= 1) for (let i = 0; i < 3; i++) { const yy = cy - 6 - ((T * 18 + i * 7) % 18); ctx.globalAlpha = 0.5; R(cx + 10 + i * 9 + Math.round(Math.sin(T * 4 + i) * 2), Math.round(yy), 2, 3, '#fff'); ctx.globalAlpha = 1; }
+      Font.small(ctx, m.pour ? (m.pour.kind === 'cof' ? 'BREWING...' : 'FROTHING...') : m.parts.length >= 4 ? 'MUG FULL' : 'READY', mx + 12, my + 16, m.parts.length >= 4 && !m.pour ? '#ffd23f' : '#3ddc84');
+      R(mx + mw - 16, my + 15, 5, 5, m.pour ? (Math.floor(T * 8) % 2 ? '#ffd23f' : '#7a5a00') : Math.floor(T * 3) % 2 ? '#3ddc84' : '#1f6b3d');
+      // the sugar bowl, heaped with cubes; it hops when you take one
+      { const hop = Math.round(m.bowl * 2), bx = 5, by = ct - 13 - hop;
+        Font.small(ctx, 'SUGAR', 10, ct - 36, '#8a5a33');
+        for (const [dx, dy] of [[4, -6], [10, -8], [16, -6], [22, -7], [7, -11], [14, -12], [20, -11], [11, -15]]) { R(bx + dx, by + dy, 6, 6, K); R(bx + dx + 1, by + dy + 1, 4, 4, '#fff'); R(bx + dx + 1, by + dy + 4, 4, 1, '#dfe5ec'); }
+        R(bx, by - 1, 34, 14, K); R(bx + 1, by, 32, 12, '#fff'); R(bx + 1, by, 32, 3, '#5b8def'); R(bx + 4, by + 5, 26, 1, '#dfe5ec'); R(bx + 3, by + 9, 28, 2, '#dfe5ec'); R(bx + 6, by + 13, 22, 1, K);
+        if (m.state === 'ready' && m.sugar < o.sugar && Math.floor(T * 3) % 2) { R(bx + 13, by - 26, 8, 6, '#ffe066'); R(bx + 15, by - 20, 4, 3, '#ffe066'); R(bx + 16, by - 17, 2, 1, '#ffe066'); } }
+      // the glass mug slides in, fills up layer by layer, then slides out
+      const slide = m.state === 'in' ? (1 - Math.min(1, m.st / 0.3)) * 140 : m.state === 'out' ? -Math.min(1, m.st / 0.45) * 140 : 0, g = o.mug;
+      const cx = Math.round(97 - cw / 2 + slide), inner = (y, h, col) => R(cx + 2, y, cw - 4, h, col);
+      // streams from the right spout
+      if (m.pour) { const top = cy + chh - 2 - ph * m.parts.length - Math.round(ph * m.pour.t / POUR_T), sx = m.pour.kind === 'cof' ? mx + 46 : mx + 59;
+        R(sx, my + 54, 3, Math.max(0, top - my - 54), m.pour.kind === 'cof' ? '#5a3520' : '#f4ead8'); R(sx + 1, my + 54, 1, Math.max(0, top - my - 54), m.pour.kind === 'cof' ? '#8a5a33' : '#ffffff');
+        if (Math.floor(T * 14) % 2) { R(sx - 2, top - 1, 1, 1, '#fff'); R(sx + 4, top - 2, 1, 1, '#fff'); } }
+      // saucer, handle in the mug's colour
+      R(cx - 6, ct - 9, cw + 12, 3, K); R(cx - 5, ct - 9, cw + 10, 2, '#f4f6f9');
+      R(cx + cw, cy + 14, 13, 36, K); R(cx + cw, cy + 15, 12, 34, g[3]); R(cx + cw, cy + 20, 7, 24, K); R(cx + cw, cy + 21, 6, 22, '#2b3446');
+      R(cx - 1, cy - 1, cw + 2, chh + 2, K); inner(cy, chh - 1, '#46546a'); R(cx + 1, cy, 1, chh - 1, '#cfe6ee'); R(cx + cw - 2, cy, 1, chh - 1, '#8fb3c2'); inner(cy + chh - 2, 1, '#8fb3c2');
+      // the layers so far, the one being poured rising
+      const layers = m.parts.slice(0, 4).map(k => [k, 1]); if (m.pour && m.parts.length < 4) layers.push([m.pour.kind, m.pour.t / POUR_T]);
+      let y = cy + chh - 2;
+      layers.forEach(([k, f], i) => { const h = Math.max(1, Math.round(ph * f)); y -= h;
+        inner(y, h, k === 'cof' ? '#5a3520' : '#f4ead8'); R(cx + 3, y + 1, 2, h - 1, k === 'cof' ? '#7a4a2c' : '#fffaf0');
+        if (i && layers[i - 1][0] !== k) inner(y + h - 1, 1, '#a87a55'); });
+      if (layers.length) { const topK = layers[layers.length - 1][0]; inner(y, 1, topK === 'cof' ? '#9c6a3e' : '#ffffff'); if (m.parts.includes('milk') && !m.pour) for (let x = cx + 5; x < cx + cw - 5; x += 6) R(x, y - 1, 3, 1, '#fffaf0'); }
+      // sugar cubes sink and dissolve at the bottom
+      for (const c of m.cubes) { if (c.t < 0.35) { const u = c.t / 0.35, x = Math.round(lerp(22, cx + 12 + (c.x % 20), u)), yy = Math.round(lerp(ct - 30, cy + 4, u) - Math.sin(u * Math.PI) * 22); R(x, yy, 5, 5, K); R(x + 1, yy + 1, 3, 3, '#fff'); }
+        else if (c.t < 1.6) { const u = (c.t - 0.35) / 1.25, sz = Math.max(1, Math.round(4 * (1 - u))), yy = Math.round(lerp(cy + 6, cy + chh - 3 - sz, Math.min(1, u * 3))); ctx.globalAlpha = 1 - u * 0.6; R(cx + 10 + (c.x % 28), yy, sz, sz, '#fff'); ctx.globalAlpha = 1; } }
+      // part marks and the glass shine
+      for (let i = 1; i <= 4; i++) R(cx - 4, cy + chh - 2 - ph * i, 3, 1, i === 4 ? '#e8424f' : '#94a3b8');
+      ctx.globalAlpha = 0.45; R(cx + 6, cy + 4, 2, chh - 12, '#ffffff'); R(cx + 9, cy + 4, 1, chh - 30, '#ffffff'); ctx.globalAlpha = 1;
+      R(cx - 1, cy - 2, cw + 2, 2, g[3]); R(cx - 1, cy - 3, cw + 2, 1, K);
+      if (m.parts.length >= 4 && m.state === 'ready') for (let i = 0; i < 3; i++) { const u = ((T * 0.9 + i * 0.33) % 1), yy = cy - 5 - u * 20; ctx.globalAlpha = 0.55 * (1 - u);
+        for (let k = 0; k < 4; k++) R(cx + 14 + i * 10 + Math.round(Math.sin(T * 3 + i * 2 + k * 0.9) * 2), Math.round(yy - k * 2), 1, 2, '#fff'); ctx.globalAlpha = 1; }
+      if (m.spill > 0) for (let i = 0; i < 12; i++) R(cx - 12 + i * 6, ct - 3 + (i % 3), 5, 2, '#5a3520');
+      // the mugs already served, lined up on the tray
+      m.done_.forEach((mg, i) => { if (i >= 52) return; const x = 6 + (i % 26) * 7, yy = LH - 54 - Math.floor(i / 26) * 8; R(x, yy, 6, 7, K); R(x + 1, yy + 1, 4, 5, mg[3]); R(x + 1, yy + 1, 4, 1, '#5a3520'); R(x + 5, yy + 2, 2, 3, K); });
       { const cb = Math.max(46, Math.min(my - 8, 70));
         Light.begin(amb('#c6c3cf', '#a29fb6'), 0.35);
         for (const x of [24, 72, 120, 168]) Light.add(x, cb + 18, 32, 26, '#ffe2b0', 0.5, 0, 1.2);
-        Light.add(97, my + 19, 52, 16, '#5dff9d', m.state === 'pour' ? 0.35 : 0.25, 0.06);
-        Light.add(97, ct - 30, 46, 40, '#ffe2b0', 0.3, 0, 1.1); Light.add(33, ct - 61, 6, 4, '#5dff9d', 0.5, 0.15);
+        Light.add(97, my + 19, 52, 16, '#5dff9d', m.pour ? 0.35 : 0.25, 0.06);
+        Light.add(97, ct - 30, 46, 46, '#ffe2b0', 0.3, 0, 1.1); Light.add(33, ct - 61, 6, 4, '#5dff9d', 0.5, 0.15);
         Light.end(); }
-      Font.smallCentered(ctx, 'CUP ' + Math.min(m.cup + 1, 3) + ' OF 3', 97, ct + 12, '#f2ead8', 1, K);
-      if (m.state === 'ready' && Math.floor(T * 3) % 2) Font.bigCentered(ctx, 'HOLD TO POUR', 97, ct + 26, '#fff', 2, K);
+      // the order ticket, with whoever is asking
+      { const tx = 6, ty = 22, tw = LW - 12, drop = m.state === 'in' ? Math.round((1 - Math.min(1, m.st / 0.3)) * -16) : 0, lines = Font.wrap(o.text, tw - 34), th = 33 + Math.max(0, lines.length - 2) * 8, t0 = ty + drop;
+        R(tx + 2, t0 + 2, tw, th, '#00000033'); R(tx - 1, t0 - 1, tw + 2, th + 2, K); R(tx, t0, tw, th, '#fff8dc'); R(tx, t0, tw, 9, '#8a5a33');
+        for (let x = tx + 3; x < tx + tw - 3; x += 6) R(x, t0 + th - 1, 3, 1, '#e9dcb0');
+        Font.small(ctx, o.who.toUpperCase() + ' WANTS:', tx + 4, t0 + 2, '#fff'); const sv = 'SERVED ' + m.served; Font.small(ctx, sv, tx + tw - 4 - Font.smallWidth(sv), t0 + 2, '#ffe066');
+        R(tx + 4, t0 + 11, 20, 20, K); R(tx + 5, t0 + 12, 18, 18, '#ffd6e8');
+        { const img = Sprites.staff('nurse', (typeof HAIR !== 'undefined' && HAIR[o.who]) || ['#4f3322', '#38231a'], 0, false); ctx.save(); ctx.beginPath(); ctx.rect(tx + 5, t0 + 12, 18, 18); ctx.clip(); ctx.drawImage(img, Math.round(tx + 14 - img.width / 2), t0 + 14); ctx.restore(); }
+        lines.forEach((l, i) => Font.small(ctx, l, tx + 28, t0 + 13 + i * 8, '#334155'));
+        if (lines.length < 2) Font.small(ctx, o.extra, tx + 28, t0 + 21, '#94a3b8');
+        // what's in the mug against the order
+        const have = [['SUGAR', m.sugar, o.sugar], ['MILK', m.parts.filter(k => k === 'milk').length, o.milk], ['COFFEE', m.parts.filter(k => k === 'cof').length, o.cof]];
+        have.forEach(([n, h, w], i) => { const x = tx + 1 + i * 62, yy = t0 + th + 3, okk = h === w, over = h > w, lbl = n + ' ' + h + '/' + w;
+          badge(x, yy, 58, 9, okk ? '#c9ffd9' : over ? '#ffd6dc' : '#fff'); Font.small(ctx, lbl, x + 29 - Math.floor(Font.smallWidth(lbl) / 2), yy + 1, okk ? '#22a35a' : over ? '#c0392b' : '#475569'); }); }
+      // their verdict
+      if (m.say) { const a = m.say.t < 1.1 ? 1 : (1.4 - m.say.t) / 0.3; ctx.globalAlpha = Math.max(0, a); bubble(m.say.text, 97, cy - 34, m.say.ok ? '#fff' : '#e8424f', m.say.ok ? '#2e8a5f' : '#fff', 4, LW - 4); ctx.globalAlpha = 1; }
+      // buttons along the bottom, with icons
+      for (const b of coffeeBtns()) { const dn = m.press && m.press.id === b.id ? 2 : 0, off = m.state !== 'ready' || m.pour, warn = b.id !== 'serve' && m.parts.length >= 4, col = off ? '#64748b' : warn ? '#9c6a3e' : b.col;
+        R(b.x - 1, b.y - 1 + dn, b.w + 2, b.h + 2 - dn, K); R(b.x, b.y + dn, b.w, b.h - dn, col); R(b.x, b.y + b.h - 4, b.w, 4, '#00000033'); R(b.x, b.y + dn, b.w, 1, off ? '#7d8ca1' : b.hi);
+        const ix = b.x + b.w / 2, iy = b.y + 6 + dn;
+        if (b.id === 'cof') { R(ix - 5, iy, 10, 9, K); R(ix - 4, iy + 1, 8, 7, '#fff'); R(ix - 4, iy + 3, 8, 5, '#5a3520'); R(ix + 4, iy + 2, 3, 4, K); }
+        else if (b.id === 'milk') { R(ix - 4, iy - 1, 8, 10, K); R(ix - 3, iy + 2, 6, 6, '#fff'); R(ix - 2, iy, 4, 2, '#fff'); R(ix - 3, iy + 4, 6, 2, '#5b8def'); }
+        else { R(ix - 4, iy + 3, 2, 2, '#fff'); R(ix - 2, iy + 5, 2, 2, '#fff'); R(ix, iy + 3, 2, 2, '#fff'); R(ix + 2, iy + 1, 2, 2, '#fff'); R(ix + 4, iy - 1, 2, 2, '#fff'); }
+        Font.smallCentered(ctx, b.label, b.x + b.w / 2, b.y + 19 + dn, '#fff', 1, K); }
       hud(m, 1 - m.t / m.dur);
     },
   };
@@ -817,12 +885,12 @@ const Minis = (() => {
   }
   function drawEnd() {
     const m = M, g = m.g; g.draw(m); drawPops(); dim();
-    const brk = m.mode === 'break', w = 170, x = Math.round(97 - w / 2), h = brk ? 82 : 96, y = Math.round(LH / 2 - h / 2) + slideIn();
+    const brk = m.mode === 'break', bl = brk && g.breakLine ? g.breakLine(m) : '', w = 170, x = Math.round(97 - w / 2), h = brk ? (bl ? 92 : 82) : 96, y = Math.round(LH / 2 - h / 2) + slideIn();
     const [line, clean] = brk ? ['', false] : g.stats(m);
     panel(x, y, w, h, brk || m.done === 'win' ? '#22a35a' : '#c0392b');
     Font.bigCentered(ctx, brk ? 'BREAK OVER!' : g.endTitle(m), 97, y + 5, '#fff', 1);
     Font.bigCentered(ctx, (brk ? '+' : '') + fmt(m.score), 97, y + 24, '#22a35a', 2, K);
-    if (brk) Font.smallCentered(ctx, 'ADDED TO THIS SHIFT', 97, y + 45, '#475569');
+    if (brk) { Font.smallCentered(ctx, 'ADDED TO THIS SHIFT', 97, y + 45, '#475569'); if (bl) Font.smallCentered(ctx, bl, 97, y + 55, '#8a5a33'); }
     else { Font.smallCentered(ctx, line, 97, y + 45, '#475569');
       Font.smallCentered(ctx, clean ? 'CLEAN RUN! +1,000 BONUS' : 'NO CLEAN-RUN BONUS THIS TIME', 97, y + 55, clean ? '#2e8a5f' : '#94a3b8'); }
     button(brk ? 'BACK TO WORK' : 'NEXT SHIFT', 97, y + h - 24, 110, '#22a35a', () => { Sound.sfx.click(); finish(true); });
