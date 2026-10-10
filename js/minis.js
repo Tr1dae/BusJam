@@ -440,13 +440,24 @@ const Minis = (() => {
     ['COFFEE', 'BEFORE', 'CHARTING', '#fff3c4', '#7a4b00'], ['RUNS ON', 'CAFFEINE', '& SPITE', '#2b3446', '#ff8a8f'], ['DO NOT', 'DISTURB', '(PLEASE)', '#dcf5e6', '#2e8a5f'],
     ['I SURVIVED', 'THE FULL', 'MOON', '#1f2a44', '#ffe066'], ['HYDRATE', 'OR', 'DIEDRATE', '#cfe9f7', '#1f4e9c'], ['TRUST ME', "I'M A", 'NURSE', '#fff', '#3fae7a'],
     ['THIS IS', 'MY BREAK', '(5 MIN)', '#ffe1c4', '#a8643a'], ['DECAF?', 'IN THIS', 'ECONOMY?', '#efe4ff', '#6b4ea0'], ['MY BLOOD', 'TYPE IS', 'COFFEE', '#e8424f', '#fff'],
-    ["DON'T", 'TALK TO ME', 'YET', '#3b4252', '#e9edf2'], ['SHIFT', 'HAPPENS', '', '#ffd23f', '#2b3446'], ['BEST NURSE', 'ACCORDING', 'TO MY CAT', '#ffd6e8', '#b5427e']];
+    ["DON'T", 'TALK TO ME', 'YET', '#3b4252', '#e9edf2'], ['SHIFT', 'HAPPENS', '', '#ffd23f', '#2b3446'], ['BEST NURSE', 'ACCORDING', 'TO MY CAT', '#ffd6e8', '#b5427e'],
+    ['PROPERTY OF', 'CVICU', 'HANDS OFF', '#cfe9f7', '#c0392b'], ['SORRY FOR', 'WHAT I SAID', 'AT 4 AM', '#efe4ff', '#6b4ea0'], ['ZERO', 'FLUIDS', 'GIVEN', '#2b3446', '#3ddc84'],
+    ['Q2 TURNS', 'Q2 COFFEE', '', '#dcf5e6', '#2e8a5f'], ['NPO', '(EXCEPT', 'COFFEE)', '#fff', '#1f4e9c'], ['THIS MUG', 'HAS BEEN', 'CHARTED', '#fff3c4', '#7a4b00'],
+    ['WILL WORK', 'FOR PIZZA', '', '#ffe1c4', '#c0392b'], ['STAT', 'COFFEE', 'NOW', '#1f2a44', '#ff8a8f'], ['DAY SHIFT', 'TOOK MY', 'PENS', '#d6ecff', '#1f4e9c'],
+    ['BEEP BEEP', 'BEEP BEEP', 'BEEP', '#3b4252', '#3ddc84'], ["IT'S NOT", 'A BAD SHIFT', 'YET', '#ffd6dc', '#b52a3a'], ['12 HOURS', 'IS A', 'LIFESTYLE', '#cfe9f7', '#2b3446'],
+    ['CAFFEINE', 'IS A', 'VITAL SIGN', '#5a3520', '#ffe066'], ['MY OTHER', 'MUG IS IN', 'THE SINK', '#e9edf2', '#64748b'], ['ASK ME', 'ABOUT MY', 'BACK PAIN', '#ffd23f', '#2b3446'],
+    ['SHH.', 'THE Q WORD', 'IS BANNED', '#2b3446', '#ffd23f']];
   // ---- coffee for the unit: fill orders of sugar, milk and coffee before the break ends ----
   const NUM = ['NO', 'ONE', 'TWO', 'THREE', 'FOUR'];
   const COFFEE_EXTRA = ['THE USUAL.', 'PLEASE. I BEG.', 'SURVIVAL MODE.', 'BEFORE ROUNDS, PLEASE.', 'DO NOT JUDGE ME.', 'HURRY. CODE SOON.', 'I HAVE BEEN AWAKE SINCE TUESDAY.',
-    'DOCTOR TOOK MY LAST ONE.', 'FOR MORALE.', 'MEDICINAL PURPOSES.', 'IT IS ONLY 3 AM.', 'STRONG ENOUGH TO CHART.'];
-  const COFFEE_YES = ['BLESS YOU.', 'YOU MAY LIVE.', 'NOW I CAN FEEL MY FACE.', 'FINALLY. A COMPETENT ADULT.', 'BEST THING ALL SHIFT.', 'I WOULD DIE FOR YOU. NOT TODAY.'];
-  const COFFEE_NO = ['THIS IS NOT MY ORDER.', 'DID THE DOCTOR MAKE THIS?', 'I SAID WHAT I SAID.', 'INCIDENT REPORT.', 'THIS TASTES LIKE NIGHT SHIFT.', 'WRONG. LIKE MY LIFE CHOICES.'];
+    'DOCTOR TOOK MY LAST ONE.', 'FOR MORALE.', 'MEDICINAL PURPOSES.', 'IT IS ONLY 3 AM.', 'STRONG ENOUGH TO CHART.',
+    'IN MY MUG. NOT THE STYROFOAM.', 'BEFORE THE FAMILY MEETING.', 'I HAVE FOUR ADMITS.', 'CHARTING IS NOT CHARTING ITSELF.', 'MAKE IT A DOUBLE. LIKE MY SHIFT.',
+    'BED 4 PRESSED THE CALL BELL AGAIN.', 'DO NOT TELL CHARGE NURSE.', 'I HAVE NOT PEED SINCE 7.', 'HANDOVER IN TEN.', 'PHARMACY IS IGNORING ME.',
+    'IT IS A FULL MOON, OKAY.', 'I LOVE YOU. PLEASE HURRY.'];
+  const COFFEE_YES = ['BLESS YOU.', 'YOU MAY LIVE.', 'NOW I CAN FEEL MY FACE.', 'FINALLY. A COMPETENT ADULT.', 'BEST THING ALL SHIFT.', 'I WOULD DIE FOR YOU. NOT TODAY.',
+    'CHARTING THIS AS A MIRACLE.', 'YOU CAN HAVE MY NEXT ADMIT. KIDDING.', 'PERFECT. NOW DO MY CHARTING.', 'ADDING YOU TO MY WILL.', 'THIS IS WHY YOU ARE MY FAVOURITE.', 'MY HEART RATE IS NORMAL AGAIN.'];
+  const COFFEE_NO = ['THIS IS NOT MY ORDER.', 'DID THE DOCTOR MAKE THIS?', 'I SAID WHAT I SAID.', 'INCIDENT REPORT.', 'THIS TASTES LIKE NIGHT SHIFT.', 'WRONG. LIKE MY LIFE CHOICES.',
+    'I AM WRITING THIS UP.', 'WHO TAUGHT YOU COFFEE?', 'THIS IS BEING ESCALATED.', 'I ASKED FOR COFFEE, NOT SOUP.', 'GIVE THIS TO DAY SHIFT.', 'NOPE. TRY AGAIN, STUDENT.'];
   const coffeeOrder = () => {
     const milk = one([0, 0, 1, 1, 2, 2, 3]), sugar = one([0, 0, 1, 2, 2, 3]), cof = 4 - milk;
     const sug = sugar === 0 ? 'NO SUGAR' : NUM[sugar] + ' SUGAR' + (sugar > 1 ? 'S' : '');
@@ -530,7 +541,7 @@ const Minis = (() => {
       R(mx, my, mw, 4, '#9aa3b2', g); R(mx, my, mw, 1, '#dfe5ec', g); R(mx + 6, my + 6, mw - 12, 26, '#55607a', g); R(mx + 6, my + 8, mw - 12, 22, '#14202e', g);
       R(mx + 6, my + 36, mw - 12, 4, '#2b3446', g); R(mx + 40, my + 40, 28, 10, '#2b3446', g); R(mx + 45, my + 50, 5, 4, '#9aa3b2', g); R(mx + 58, my + 50, 5, 4, '#9aa3b2', g); R(mx + 46, my + 44, 3, 3, '#8a5a33', g); R(mx + 59, my + 44, 3, 3, '#f4ead8', g);
       Font.smallCentered(g, 'BREW-O-MATIC 3000', 97, my + 58, '#9aa3b2');
-      [['#e8424f', 76], ['#3ddc84', 90], ['#9aa3b2', 104]].forEach(([c, y]) => { disc(mx + 15, my + y, 4, K, g); disc(mx + 15, my + y, 3, c, g); disc(mx + mw - 16, my + y, 4, K, g); disc(mx + mw - 16, my + y, 3, '#9aa3b2', g); });
+      [['#e8424f', 76], ['#3ddc84', 90], ['#9aa3b2', 104]].forEach(([c, y]) => { disc(mx + 11, my + y, 4, K, g); disc(mx + 11, my + y, 3, c, g); disc(mx + mw - 12, my + y, 4, K, g); disc(mx + mw - 12, my + y, 3, '#9aa3b2', g); });
       R(mx + 4, ct - 8, mw - 8, 8, '#2b3446', g); for (let x = mx + 8; x < mx + mw - 8; x += 4) R(x, ct - 7, 2, 1, '#55607a', g);
       // sugar jar and a box of very old donuts
       R(160, ct - 12, 30, 12, K, g); R(161, ct - 11, 28, 10, '#ff7eb6', g); R(158, ct - 22, 34, 11, K, g); R(159, ct - 21, 32, 9, '#ffb3d1', g); R(165, ct - 18, 20, 3, '#fff', g);
@@ -550,30 +561,38 @@ const Minis = (() => {
         if (m.state === 'ready' && m.sugar < o.sugar && Math.floor(T * 3) % 2) { R(bx + 13, by - 26, 8, 6, '#ffe066'); R(bx + 15, by - 20, 4, 3, '#ffe066'); R(bx + 16, by - 17, 2, 1, '#ffe066'); } }
       // the glass mug slides in, fills up layer by layer, then slides out
       const slide = m.state === 'in' ? (1 - Math.min(1, m.st / 0.3)) * 140 : m.state === 'out' ? -Math.min(1, m.st / 0.45) * 140 : 0, g = o.mug;
-      const cx = Math.round(97 - cw / 2 + slide), inner = (y, h, col) => R(cx + 2, y, cw - 4, h, col);
-      // streams from the right spout
-      if (m.pour) { const top = cy + chh - 2 - ph * m.parts.length - Math.round(ph * m.pour.t / POUR_T), sx = m.pour.kind === 'cof' ? mx + 46 : mx + 59;
+      const cx = Math.round(97 - cw / 2 + slide);
+      // what's in the mug so far, the part being poured still rising
+      const layers = m.parts.slice(0, 4).map(k => [k, 1]); if (m.pour && m.parts.length < 4) layers.push([m.pour.kind, m.pour.t / POUR_T]);
+      // streams from the two spouts, into the mouth of the mug
+      if (m.pour) { const top = cy + 2, sx = m.pour.kind === 'cof' ? mx + 46 : mx + 59;
         R(sx, my + 54, 3, Math.max(0, top - my - 54), m.pour.kind === 'cof' ? '#5a3520' : '#f4ead8'); R(sx + 1, my + 54, 1, Math.max(0, top - my - 54), m.pour.kind === 'cof' ? '#8a5a33' : '#ffffff');
-        if (Math.floor(T * 14) % 2) { R(sx - 2, top - 1, 1, 1, '#fff'); R(sx + 4, top - 2, 1, 1, '#fff'); } }
-      // saucer, handle in the mug's colour
+        if (Math.floor(T * 14) % 2) { R(sx - 2, top - 2, 1, 1, '#fff'); R(sx + 4, top - 3, 1, 1, '#fff'); } }
+      // saucer, then the handle and the body of tonight's branded mug
       R(cx - 6, ct - 9, cw + 12, 3, K); R(cx - 5, ct - 9, cw + 10, 2, '#f4f6f9');
       R(cx + cw, cy + 14, 13, 36, K); R(cx + cw, cy + 15, 12, 34, g[3]); R(cx + cw, cy + 20, 7, 24, K); R(cx + cw, cy + 21, 6, 22, '#2b3446');
-      R(cx - 1, cy - 1, cw + 2, chh + 2, K); inner(cy, chh - 1, '#46546a'); R(cx + 1, cy, 1, chh - 1, '#cfe6ee'); R(cx + cw - 2, cy, 1, chh - 1, '#8fb3c2'); inner(cy + chh - 2, 1, '#8fb3c2');
-      // the layers so far, the one being poured rising
-      const layers = m.parts.slice(0, 4).map(k => [k, 1]); if (m.pour && m.parts.length < 4) layers.push([m.pour.kind, m.pour.t / POUR_T]);
-      let y = cy + chh - 2;
-      layers.forEach(([k, f], i) => { const h = Math.max(1, Math.round(ph * f)); y -= h;
-        inner(y, h, k === 'cof' ? '#5a3520' : '#f4ead8'); R(cx + 3, y + 1, 2, h - 1, k === 'cof' ? '#7a4a2c' : '#fffaf0');
-        if (i && layers[i - 1][0] !== k) inner(y + h - 1, 1, '#a87a55'); });
-      if (layers.length) { const topK = layers[layers.length - 1][0]; inner(y, 1, topK === 'cof' ? '#9c6a3e' : '#ffffff'); if (m.parts.includes('milk') && !m.pour) for (let x = cx + 5; x < cx + cw - 5; x += 6) R(x, y - 1, 3, 1, '#fffaf0'); }
-      // sugar cubes sink and dissolve at the bottom
-      for (const c of m.cubes) { if (c.t < 0.35) { const u = c.t / 0.35, x = Math.round(lerp(22, cx + 12 + (c.x % 20), u)), yy = Math.round(lerp(ct - 30, cy + 4, u) - Math.sin(u * Math.PI) * 22); R(x, yy, 5, 5, K); R(x + 1, yy + 1, 3, 3, '#fff'); }
-        else if (c.t < 1.6) { const u = (c.t - 0.35) / 1.25, sz = Math.max(1, Math.round(4 * (1 - u))), yy = Math.round(lerp(cy + 6, cy + chh - 3 - sz, Math.min(1, u * 3))); ctx.globalAlpha = 1 - u * 0.6; R(cx + 10 + (c.x % 28), yy, sz, sz, '#fff'); ctx.globalAlpha = 1; } }
-      // part marks and the glass shine
-      for (let i = 1; i <= 4; i++) R(cx - 4, cy + chh - 2 - ph * i, 3, 1, i === 4 ? '#e8424f' : '#94a3b8');
-      ctx.globalAlpha = 0.45; R(cx + 6, cy + 4, 2, chh - 12, '#ffffff'); R(cx + 9, cy + 4, 1, chh - 30, '#ffffff'); ctx.globalAlpha = 1;
-      R(cx - 1, cy - 2, cw + 2, 2, g[3]); R(cx - 1, cy - 3, cw + 2, 1, K);
-      if (m.parts.length >= 4 && m.state === 'ready') for (let i = 0; i < 3; i++) { const u = ((T * 0.9 + i * 0.33) % 1), yy = cy - 5 - u * 20; ctx.globalAlpha = 0.55 * (1 - u);
+      R(cx - 1, cy - 1, cw + 2, chh + 2, K); R(cx, cy, cw, chh, g[3]); R(cx, cy + chh - 2, 2, 2, K); R(cx + cw - 2, cy + chh - 2, 2, 2, K);
+      ctx.globalAlpha = 0.35; R(cx + 2, cy + 6, 2, chh - 14, '#fff'); R(cx + 5, cy + 6, 1, chh - 34, '#fff'); ctx.globalAlpha = 0.14; R(cx + cw - 5, cy, 5, chh, '#000'); R(cx, cy + chh - 3, cw, 3, '#000'); ctx.globalAlpha = 1;
+      // the slogan, printed big on the front
+      { const ln = g.slice(0, 3).filter(Boolean), y0 = cy + 38 - Math.round(ln.length * 9 / 2);
+        ln.forEach((t, i) => Font.smallCentered(ctx, t, cx + cw / 2 - 2, y0 + i * 9, g[4])); }
+      // looking into the mouth: dark when empty, then the brew, paler with every part of milk
+      { const n = layers.reduce((a, [, f]) => a + f, 0), mk = layers.reduce((a, [k, f]) => a + (k === 'milk' ? f : 0), 0), w = n ? mk / n : 0;
+        const C = [0x5a, 0x35, 0x20], M = [0xf4, 0xea, 0xd8], col = 'rgb(' + C.map((c, i) => Math.round(c + (M[i] - c) * w)).join(',') + ')';
+        R(cx, cy - 2, cw, 6, K); R(cx + 2, cy - 1, cw - 4, 4, '#3b2a22');
+        if (n > 0) { R(cx + 2, cy + 1 - Math.min(2, Math.floor(n * 0.75)), cw - 4, 2 + Math.min(2, Math.floor(n * 0.75)), col);
+          if (mk && !m.pour) for (let x = cx + 6; x < cx + cw - 6; x += 7) R(x, cy, 3, 1, '#fffaf0'); }
+        R(cx - 1, cy - 3, cw + 2, 1, K); R(cx, cy - 2, cw, 1, g[3]); R(cx, cy + 4, cw, 1, K); }
+      // a fill gauge on the machine beside the mug: four parts, layered as poured
+      { const gx = Math.round(97 - cw / 2) - 9, gb = cy + chh - 2;
+        R(gx - 1, gb - ph * 4 - 2, 7, ph * 4 + 4, K); R(gx, gb - ph * 4 - 1, 5, ph * 4 + 2, '#14202e');
+        let y = gb; layers.forEach(([k, f], i) => { const h = Math.max(1, Math.round(ph * f)); y -= h; R(gx, y, 5, h, k === 'cof' ? '#5a3520' : '#f4ead8'); R(gx, y, 1, h, k === 'cof' ? '#8a5a33' : '#fff');
+          if (i && layers[i - 1][0] !== k) R(gx, y + h - 1, 5, 1, '#a87a55'); });
+        for (let i = 1; i <= 4; i++) R(gx - 3, gb - ph * i, 3, 1, i === 4 ? '#e8424f' : '#94a3b8'); }
+      // sugar cubes arc over and plop in
+      for (const c of m.cubes) { if (c.t < 0.35) { const u = c.t / 0.35, x = Math.round(lerp(22, cx + 12 + (c.x % 20), u)), yy = Math.round(lerp(ct - 30, cy - 2, u) - Math.sin(u * Math.PI) * 26); R(x, yy, 5, 5, K); R(x + 1, yy + 1, 3, 3, '#fff'); }
+        else if (c.t < 0.6) { const u = (c.t - 0.35) / 0.25, x = cx + 14 + (c.x % 20); ctx.globalAlpha = 1 - u; R(x - 3, cy - 2 - u * 5, 1, 1, '#fff'); R(x + 5, cy - 3 - u * 4, 1, 1, '#fff'); R(x + 1, cy - 4 - u * 7, 1, 1, '#fff'); ctx.globalAlpha = 1; } }
+      if (m.parts.length >= 4 && m.state === 'ready') for (let i = 0; i < 3; i++) { const u = ((T * 0.9 + i * 0.33) % 1), yy = cy - 6 - u * 20; ctx.globalAlpha = 0.55 * (1 - u);
         for (let k = 0; k < 4; k++) R(cx + 14 + i * 10 + Math.round(Math.sin(T * 3 + i * 2 + k * 0.9) * 2), Math.round(yy - k * 2), 1, 2, '#fff'); ctx.globalAlpha = 1; }
       if (m.spill > 0) for (let i = 0; i < 12; i++) R(cx - 12 + i * 6, ct - 3 + (i % 3), 5, 2, '#5a3520');
       // the mugs already served, lined up on the tray

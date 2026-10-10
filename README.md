@@ -23,7 +23,7 @@ Every shift is followed by a random minigame (Call Light Frenzy, Emergency Rush,
 - **Group Hangout:** tap each nurse to hear their 5-7 free dates (random order), then tap the one date everyone shares on the calendar. Two guesses, 60 seconds; a wrong guess tells you who can't make it. The generator guarantees exactly one common date and adds near-miss dates that all but one nurse share.
 - **Med Pass:** drag the med cup to catch the pills on the order card, which changes per patient. Tylenol is always fine; anything else is a wrong med, and three ends it.
 
-Once or twice a shift (from shift 2) a surprise break pauses play: **Coffee Run** (60 seconds of the unit's coffee orders, like "two sugars, one milk, three coffee": tap the sugar bowl for cubes, pour coffee and milk with the buttons, four parts fill a mug, then serve; wrong orders and overflowing mugs break the streak) or **Pizza Defense** (slap day shift's hands away from the pizza, but not the manager's, who brings more). Break points go to the current shift. `?mini=calls|cpr|meds|hangout|coffee|pizza` jumps straight into one. Code is in `js/minis.js`.
+Once or twice a shift (from shift 2) a surprise break pauses play: **Coffee Run** (60 seconds of the unit's coffee orders, like "two sugars, one milk, three coffee": tap the sugar bowl for cubes, pour coffee and milk with the buttons, four parts fill one of 32 branded slogan mugs while a gauge shows the layers, then serve; wrong orders and overflowing mugs break the streak) or **Pizza Defense** (slap day shift's hands away from the pizza, but not the manager's, who brings more). Break points go to the current shift. `?mini=calls|cpr|meds|hangout|coffee|pizza` jumps straight into one. Code is in `js/minis.js`.
 
 ## Emergency Rush
 
