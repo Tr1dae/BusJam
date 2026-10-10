@@ -646,7 +646,8 @@ const Minis = (() => {
   };
 
   // ======================= GROUP HANGOUT (find the date that suits everyone) =======================
-  const CREW = ['Becca', 'Sarah', 'Jess', 'Carly', 'Katrina', 'Jann', 'Angela', 'Sophie'];
+  // eight fit on screen, so each hangout invites eight of the cast at random
+  let CREW = [];
   const EXCUSES = ["I'M ON NIGHTS. I'M ALWAYS ON NIGHTS.", 'PICKING UP OT. RENT IS RENT.', "I'LL BE ASLEEP. ALL DAY.", "MAYBE? (THAT'S A NO.)", "THAT'S MY ONE DAY OFF.",
     'MANDATORY TRAINING. ON HAND WASHING.', "ON CALL. DON'T ASK.", 'MY CAT HAS A VET THING.', "GYM. I WON'T GO, BUT STILL.", 'FLOATING TO THE ED. PRAY FOR ME.',
     'MY BODY IS STILL ON NIGHTS.', 'I HAVE A NAP SCHEDULED.', "CAN'T. STILL CHARTING LAST SHIFT.", 'SKILLS DAY. THE CPR DUMMY AWAITS.', 'LAUNDRY. FOUR WEEKS OF IT.',
@@ -662,6 +663,7 @@ const Minis = (() => {
     ],
     goal: 'FIRST GUESS RIGHT = +1,000 BONUS',
     init(m) {
+      CREW = NURSES.slice().sort(() => Math.random() - 0.5).slice(0, 8);
       m.dur = 60; m.lives = 2; m.maxLives = 2; m.days = 30; m.start = Math.floor(Math.random() * 5); m.sel = -1; m.selT = 0; m.asked = new Set(); m.guesses = []; m.say = null;
       m.month = one(['JUNE', 'SEPTEMBER', 'NOVEMBER', 'APRIL']);
       for (let tries = 0; tries < 200; tries++) {

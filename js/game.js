@@ -105,9 +105,9 @@ const INTROS = {
 
 // ---------- staff cameos ----------
 // one of Becca's friends drops by once a shift; now and then a doctor pops up too
-const NURSES = ['Becca', 'Sarah', 'Jess', 'Carly', 'Katrina', 'Jann', 'Angela', 'Sophie'];
+const NURSES = ['Becca', 'Sarah', 'Jess', 'Carly', 'Katrina', 'Jann', 'Angela', 'Sophie', 'Evelyn'];
 const HAIR = { Becca: ['#4f3322', '#38231a'], Sarah: ['#f0c75e', '#c99a32'], Jess: ['#7a4a2a', '#5c3620'], Carly: ['#b5532e', '#843a1f'],
-  Katrina: ['#3a2f3a', '#241c26'], Jann: ['#a8743f', '#7d5329'], Angela: ['#d98a4e', '#a8643a'], Sophie: ['#e8d38a', '#bfa45a'] };
+  Katrina: ['#3a2f3a', '#241c26'], Jann: ['#a8743f', '#7d5329'], Angela: ['#d98a4e', '#a8643a'], Sophie: ['#e8d38a', '#bfa45a'], Evelyn: ['#6b3a2a', '#4a2519'] };
 const NURSE_LINES = [
   "Bed 4 wants a sandwich. Bed 4 is NPO. Bed 4 is furious.",
   "Someone googled their symptoms. They're dying of everything.",
