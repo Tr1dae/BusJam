@@ -1,6 +1,6 @@
 // Minigames. Three rotate with Emergency Rush between shifts (Call Light Frenzy, Code Blue,
 // Med Pass Catch); two are short surprise breaks in the middle of a shift (Coffee Pour,
-// Break Room Defense). Uses the shared helpers from game.js (R, disc, ellipse, Font, LW, LH, T, K...).
+// Break Room Defense), plus a Therapy Dog visit every third shift. Uses the shared helpers from game.js (R, disc, ellipse, Font, LW, LH, T, K...).
 const Minis = (() => {
   let M = null;
   const rnd = (a, b) => a + Math.random() * (b - a), one = a => a[Math.floor(Math.random() * a.length)];
@@ -857,13 +857,277 @@ const Minis = (() => {
     endTitle: m => m.done === 'win' ? "IT'S A DATE!" : 'GROUP CHAT DIED',
   };
 
-  const GAMES = { calls, cpr, meds, hangout, coffee, pizza };
+  // ======================= THERAPY DOG (rare mid-shift break) =======================
+  // Biscuit, traced from Marco's reference art. One grid, cut into parts at load (tail, head, ears,
+  // front leg, body) so each can move on its own; faces are painted over the head each frame.
+  const DOG = [
+    '....................KKKKKKKKKKKK..............',
+    '..................KKkaaaaeeeeeeeKK............',
+    '................KKaaaaaaaaaaaaaaeeKKKK........',
+    '...............KcaaaaaaaaaaaaaaaaaedeeK.......',
+    '............KKKaaaaaaaaaaaaaaaaaaaawcaeK......',
+    '...........KkccaaaaaaaaaaaaaaaaaaaaaecceK.....',
+    '..........KcccccaaaaaaaaaaaaaaaaaaaaafcceK....',
+    '.........KcccccccaaaaaaaaaaaaaaaaaaaaafcceK...',
+    '........KkcccccccaaaaaaaaaaaaaaaaaaaaakccceK..',
+    '.......KkccccccccaaaaaaaaaaaaaaaaaaaaaafcccK..',
+    '......KfccccccccfaaaaaaaaaaaaaaaaaaaaaafcccaK.',
+    '......KcccccccccfaaaaaaaaaaaaaaaaaaaaaaagcccaK',
+    '.....KkcccccccccfaaaaaaaaaaaaaaaaaaaaaaagccccK',
+    '....KkcccccccccfaaaaaaaaaaaaaaaaaaaXXaaagccccK',
+    '....KkcccccccccfaaaaaXXXaaaaaaaaaaXwXXaagccccK',
+    '....KkcccccccccfaaaaXXXwXaaaaaaaaaXXXXaagccccK',
+    '....KkkccccccccfaaaaXXXXXaaaaaaaaaXXXXaaKkcckK',
+    '.....KkccccccccfaaaaXXXXXaaaaXXiaaXKKXaaKkkcK.',
+    '......KkcccccccfaaaaXKKKXaaaaXXXXaaKKddaaKkkK.',
+    '......KkkkcccccfaadddKKKaaaaaaXXaaaaadddaKkkK.',
+    '.......KkkccccfaaaddddaaaaaXaaXXaXaaaadaaKKK..',
+    '........KkkccfKkaaadddaaaaaaXXddXaaaaaaaaK....',
+    '..KK.....KkkkKKkaaaaaaaaaaaaXdddXaaaaaaaaK....',
+    '.KaeK.....KKK.KkkaaaaaaaaaaaadddaaaaaaaaK.....',
+    'KaaeK..........KkkaaaaaaaaaaaaaaaaaaaaaK......',
+    'KaaeK.......XXXXXkkaaaaaaaaaaaaaaaaaakK.......',
+    'KaaaeK....XXvlllvXXkkkaaaaaaaaaaaaakKK........',
+    'KaaaaeK..XXvlllllliXXXkkkkkkkkkkXXXX..........',
+    'KkaaaaeKKXvllwlwlllvXXXXXXXXXXXXXXXX..........',
+    'KkkkaaaaKilwllllwlllvvXXXXXXXvXXXXvX..........',
+    '.KkkkaaaKillwwwwllllllivvvvvvvvvvvvX..........',
+    '..KkkkkKkillwwwwllllllillllwwwwwvvvX..........',
+    '...KkkkKkilllwwllliiiiilllvwwrrwvvvX..........',
+    '....KKKKkXvlllllliaaaaivllvwwrrwvvXK..........',
+    '.......KkkXvlllliaaaaaaivlveewwwvXkK..........',
+    '.......KkkkXvvvviaaaaaaailviiiiiXkkK..........',
+    '......KkkkkkXvvviaaaaaaaivvvvvvXkkkK..........',
+    '......KkkkkkkXvvXkaaaaaaKvvvvvXkkkK...........',
+    '......KkkkkkkXXXXkaaaaaaKvvvvXkkkkK...........',
+    '......KkkkkkK.KkkKaaaaaaKXXXXkkkkkK...........',
+    '......KkgkgkK.KkkKkaaaaaK...KkkkkkkK..........',
+    '......KkgkgkK..KKKKaaaaaaK..KkkgkgkK..........',
+    '.......KKKKK......KaakakaK...KkgkgkK..........',
+    '...................KakakaK....KKKKK...........',
+    '....................KKKKK.....................',
+  ];
+  const DOG_PAL = { K: '#3c1c1b', X: '#0b0a15', k: '#c8865f', a: '#f7cd91', c: '#f2b974', d: '#e1997e', f: '#b06749', g: '#784439', i: '#213064', l: '#3fa2da', v: '#2d5499', r: '#d5343c', w: '#fcf9f0', e: '#efe6dc' };
+  const DOG_QUOTES = [
+    "YOU'RE SUCH A GOOD BOY. YOU'D NEVER PULL OUT YOUR IV, WOULD YOU?", "WHO'S A GOOD BOY? YOU'VE NEVER ONCE ASKED ME FOR A WARM BLANKET.",
+    "YOU WOULD NEVER CLIMB OVER THE BED RAILS AT 3 AM, WOULD YOU?", "LOOK AT YOU. NOT ONE COMPLAINT ABOUT THE HOSPITAL FOOD.",
+    "YOU'D NEVER PRESS THE CALL BELL JUST TO ASK WHAT TIME IT IS.", "YOU'D TAKE YOUR MEDS IN APPLESAUCE AND SAY THANK YOU. GOOD BOY.",
+    "YOU'RE THE ONLY ONE ON THIS UNIT WHO'S HAPPY TO SEE ME AT 4 AM.", "YOU WOULD NEVER GOOGLE YOUR SYMPTOMS AND ARGUE WITH ME, WOULD YOU?",
+    "YOU'D NEVER SAY YOUR PAIN IS 12 OUT OF 10 WHILE EATING CHIPS.", "YOU'D STAY NPO AND NOT EVEN WHINE ABOUT IT. SUCH A GOOD BOY.",
+    "YOU'D NEVER PULL OFF YOUR TELE LEADS TO GO TO THE BATHROOM.", "YOU DON'T EVEN KNOW WHAT A CHARTING AUDIT IS. LUCKY BOY.",
+    "WHO'S A GOOD BOY? NOT BED 7. BED 7 IS A VERY BAD BOY.", "YOU'D NEVER LEAVE AMA. YOU'RE A LOYAL BOY, AREN'T YOU?",
+    "YOU HAVE BETTER BEDSIDE MANNER THAN HALF THE RESIDENTS.", "YOU'D NEVER SET OFF YOUR BED ALARM ON PURPOSE, WOULD YOU?",
+    "YOU'RE NOT A FALL RISK. YOU'RE A FALL IN LOVE RISK.", "CAN YOU COVER MY BREAK? NO? STILL A GOOD BOY.",
+    "YOU'D NEVER ASK WHEN THE REAL DOCTOR IS COMING, WOULD YOU?", "YOU'RE THE ONLY THING ON THIS UNIT THAT ISN'T BEEPING.",
+    "YOU'D NEVER EAT THE PIZZA NIGHT SHIFT WAS SAVING. RIGHT? RIGHT?", "YOU'D LET ME DO YOUR VITALS WITHOUT A FIGHT, WOULDN'T YOU?",
+    "YOU'D NEVER HAVE TEN VISITORS IN A TWO BED ROOM, WOULD YOU?", "YOU'D PASS YOUR SWALLOW EVAL FIRST TRY. YES YOU WOULD.",
+    "YOU'D NEVER SAY THE Q WORD ON NIGHT SHIFT. GOOD BOY.", "YOU'D NEVER CODE RIGHT AT SHIFT CHANGE, WOULD YOU? NO YOU WOULDN'T.",
+    "PERFECT SATS, PERFECT EARS. CHARTING THIS AS NORMAL. VERY NORMAL.", "YOU'D NEVER TELL THE DOCTOR A TOTALLY DIFFERENT STORY THAN ME.",
+    "CAN WE ADMIT YOU? ONE ON ONE NURSING. I VOLUNTEER.", "YOU'D NEVER ASK FOR YOUR FIFTH CUP OF ICE CHIPS. LOOK AT THAT FACE.",
+    "YOU'D NEVER SAY YOU'RE BASICALLY A NURSE BECAUSE YOU WATCH TV.", "YOU'D NEVER HIDE A SANDWICH UNDER YOUR PILLOW ON A FLUID RESTRICTION.",
+    "WHO DOESN'T NEED A SITTER? YOU DON'T NEED A SITTER.", "YOU'D NEVER CALL YOUR FAMILY TO COMPLAIN BEFORE PRESSING THE CALL BELL.",
+    "YOU'D WAIT FOR ME TO GET THE LIFT. YOU WOULDN'T JUST STAND UP.", "I HAVE NOT PEED IN NINE HOURS. YOU GO FOR BOTH OF US, BUDDY.",
+    "YOU NEVER ONCE ASKED ME IF I'M A REAL NURSE. GOOD BOY.", "IF YOU WERE MY ONLY PATIENT I WOULD CHART ON TIME. ALL OF IT.",
+  ];
+  const DOG_S = 3, DOG_W = 46, DOG_H = 45;
+  // where a cell belongs: the tail wags, the head leans and bobs, the front leg gives paw
+  let DOG_CELLS = null;
+  const dogCells = () => DOG_CELLS || (DOG_CELLS = DOG.flatMap((r, y) => [...r].map((ch, x) => {
+    if (ch === '.') return null;
+    let part = 'body';
+    if (y >= 22 && y <= 33 && x <= 7) part = 'tail';
+    else if (y <= 24 || (y === 25 && x >= 17) || (y === 26 && x >= 19)) part = 'head';
+    else if (x >= 17 && x <= 25 && y >= 33 && 'aKke'.includes(ch)) part = 'leg';
+    // the floppy part of each ear, drawn again on top so it can droop or perk
+    let ear = 0;
+    if (part === 'head' && y >= 7 && y <= 23) {
+      const row = DOG[y], fl = row.indexOf('f', 12), lb = y >= 22 ? (y === 22 ? 14 : 13) : y >= 10 && fl >= 0 && fl < 20 ? fl : row.indexOf('a');
+      if (x < lb) ear = -1;
+      let rb = Math.max(row.lastIndexOf('f'), row.lastIndexOf('g'), row.lastIndexOf('k')); if (y >= 16 && y <= 20) rb = row.indexOf('K', 39) - 1;
+      if (y <= 20 && rb > 30 && x > rb) ear = 1;
+    }
+    return { x, y, col: DOG_PAL[ch], ch, part, ear };
+  }).filter(Boolean)));
+  const DOG_EYES = [[20, 14, 6], [34, 13, 6]];   // each eye's box: left, top, height (5 wide)
+  const HAND = ['..KK.KK.KK....', '.KqpKqpKqpK...', '.KppKppKppKK..', '.KppKppKppKqK.', '.KppppppppKpK.', '.KpppppppppK..', '.KpppppppppK..',
+    '..KppppppppK..', '..KpppppppK...', '...KPPPPPK....', '...KQQQQQK....', '...KKKKKKK....'];
+  const DOG_HEART = ['.hh.hh.', 'hHhhhhh', 'hhhhhhh', '.hhhhh.', '..hhh..', '...h...'];
+  const dog = {
+    title: 'THERAPY DOG!', head: '#3fa2da', song: 'break', isBreak: true, noIntro: true,
+    blurb: '', rows: [],
+    init(m) {
+      m.score = 1500; m.hap = 0; m.hand = null; m.lastStroke = -9; m.dist = 0; m.downAt = 0; m.moved = 0;
+      m.wag = 0; m.lean = 0; m.leanT = 0; m.tilt = 0; m.nextTilt = 3 + Math.random() * 3; m.blink = 0; m.nextBlink = 1.5; m.woof = 9; m.paw = 9; m.nextPaw = 6;
+      m.twitch = 9; m.twitchSide = 1; m.nextTwitch = 4; m.hearts = []; m.pets = 0;
+      m.quotes = DOG_QUOTES.slice().sort(() => Math.random() - 0.5); m.qi = 0; m.q = null; m.nextQ = 0.7; m.side = Math.random() < 0.5 ? -1 : 1;
+    },
+    // where Biscuit sits on screen, and which of his cells a point lands on
+    pos: () => { const x = Math.round(97 - DOG_W * DOG_S / 2) + 3, by = LH - 40; return { x, y: by - DOG_H * DOG_S, by }; },
+    cellAt(p) { const { x, y } = dog.pos(), cx = Math.floor((p.x - x) / DOG_S), cy = Math.floor((p.y - y) / DOG_S); return { cx, cy, on: cx >= -2 && cx < DOG_W + 2 && cy >= -2 && cy < DOG_H + 1 }; },
+    update(m, dt) {
+      const stroking = m.hand && T - m.lastStroke < 0.35;
+      m.hap = stroking ? Math.min(1, m.hap + dt * 1.6) : Math.max(0, m.hap - dt * (m.hand ? 0.25 : 0.45));
+      m.wag += dt * (5 + m.hap * 11 + (m.woof < 0.6 ? 8 : 0));
+      // little life: blinks, curious head tilts, ear twitches, now and then a paw for attention
+      if (m.t > m.nextBlink) { m.blink = 0.14; m.nextBlink = m.t + 2 + Math.random() * 3; } m.blink = Math.max(0, m.blink - dt);
+      if (m.t > m.nextTilt && !m.hand) { m.tilt = Math.random() < 0.5 ? -1 : 1; m.tiltT = 1.3; m.nextTilt = m.t + 4 + Math.random() * 4; }
+      if (m.tiltT > 0) { m.tiltT -= dt; if (m.tiltT <= 0) m.tilt = 0; }
+      if (m.t > m.nextTwitch) { m.twitch = 0; m.twitchSide = Math.random() < 0.5 ? -1 : 1; m.nextTwitch = m.t + 3 + Math.random() * 5; } m.twitch += dt;
+      if (m.t > m.nextPaw && !m.hand && m.hap < 0.2) { m.paw = 0; m.nextPaw = m.t + 7 + Math.random() * 5; } m.paw += dt; m.woof += dt;
+      // lean into the hand that's petting him
+      const want = m.hand && m.hap > 0.15 ? Math.max(-2, Math.min(2, Math.round((m.hand.x - 97) / 18))) : m.tilt;
+      m.leanT += dt; if (m.leanT > 0.07 && m.lean !== want) { m.lean += Math.sign(want - m.lean); m.leanT = 0; }
+      m.hearts.forEach(h => { h.t += dt; h.y -= dt * (16 + h.t * 10); h.x += Math.sin(h.t * 5 + h.ph) * dt * 8; }); m.hearts = m.hearts.filter(h => h.t < 1.3);
+      // someone just off screen always has something to say to him
+      if (m.t > m.nextQ) { m.side = -m.side; m.q = { text: m.quotes[m.qi % m.quotes.length], who: one(NURSES), side: m.side, t: 0, y: null }; m.qi++; m.nextQ = m.t + 5.2; }
+      if (m.q) { m.q.t += dt; if (m.q.t > 4.9) m.q = null; }
+    },
+    down(m, p) { const c = dog.cellAt(p); if (!c.on) return; m.hand = { x: p.x, y: p.y }; m.downAt = m.t; m.moved = 0; m.down = c; },
+    move(m, p) {
+      if (!m.hand) return; const d = Math.hypot(p.x - m.hand.x, p.y - m.hand.y); m.hand = { x: p.x, y: p.y }; m.moved += d; m.dist += d;
+      if (d > 0.5) m.lastStroke = T;
+      if (m.dist > 10) { m.dist = 0; m.pets++; m.hearts.push({ x: p.x + rnd(-6, 6), y: p.y - 10, t: 0, ph: rnd(0, 6) }); Sound.sfx.pet(); if (m.pets % 6 === 0) Sound.sfx.happy(); }
+    },
+    up(m) {
+      if (m.hand && m.moved < 4 && m.t - m.downAt < 0.35) {
+        // a tap, not a stroke: a paw for the paw, a boof for everything else
+        const c = m.down;
+        if (c.cx >= 16 && c.cx <= 26 && c.cy >= 33) { m.paw = 0; pop('HIGH FIVE!', m.hand.x, m.hand.y - 14, '#ffe066'); Sound.sfx.happy(); }
+        else { m.woof = 0; pop(one(['BOOF!', 'WOOF!', 'ARF!', 'BORK!']), m.hand.x, m.hand.y - 14, '#fff'); Sound.sfx.woof(); }
+        m.hearts.push({ x: m.hand.x, y: m.hand.y - 8, t: 0, ph: 0 });
+      }
+      m.hand = null; m.down = null;
+    },
+    // paint Biscuit into a small canvas at one pixel per cell, then blow him up
+    paintDog(m) {
+      const PAD = 6, cv = dog.cv || (dog.cv = document.createElement('canvas')); cv.width = DOG_W + PAD * 2; cv.height = DOG_H + PAD;
+      const g = cv.getContext('2d'), P = (x, y, col) => R(x + PAD, y + PAD, 1, 1, col, g);
+      const hap = m.hap, petting = m.hand && hap > 0.15, woof = m.woof < 0.3, pawUp = m.paw < 0.9 ? (m.paw < 0.15 || m.paw > 0.75 ? 2 : 3) : 0;
+      const tail = Math.round(Math.sin(m.wag) * (1.6 + hap * 1.6));
+      const hy = woof ? -2 : petting ? (Math.sin(T * 9) > 0 ? -1 : 0) : Math.sin(m.t * 2.3) > 0.5 ? 1 : 0;
+      const lean = m.lean, hx = y => Math.round(lean * (24 - y) / 24);
+      const H = (x, y, col) => P(x + hx(y), y + hy, col);
+      const earDy = woof || (m.twitch < 0.22) ? -1 : petting ? 1 : 0, earDx = petting ? 1 : 0;
+      const cells = dogCells();
+      // tail behind, swishing from its base
+      for (const c of cells) if (c.part === 'tail') P(c.x + Math.round(tail * (33 - c.y) / 11), c.y, c.col);
+      for (const c of cells) if (c.part === 'body' || (c.part === 'head' && c.y >= 22)) P(c.x, c.y, c.col);
+      for (const c of cells) if (c.part === 'leg') P(c.x, c.y - pawUp, c.col);
+      for (const c of cells) if (c.part === 'head') H(c.x, c.y, c.col);
+      for (const c of cells) if (c.ear) { const tw = m.twitch < 0.22 && c.ear === m.twitchSide; H(c.x + c.ear * earDx, c.y + (tw || woof ? -1 : earDy > 0 ? earDy : 0), c.col); }
+      // the face: eyes look, blink, and squeeze shut when it's good
+      const look = m.hand && !petting ? Math.max(-1, Math.min(1, Math.round((m.hand.x - 97) / 30))) : m.q && m.q.t < 1.6 ? m.q.side : 0;
+      const shut = hap > 0.4, blink = m.blink > 0;
+      DOG_EYES.forEach(([ex, ey, eh], i) => {
+        for (let y = 0; y < eh; y++) for (let x = 0; x < 5; x++) H(ex + x, ey + y, DOG_PAL.a);
+        const b = ey + eh - 3;
+        if (shut) { for (const [x, y] of [[0, 1], [1, 0], [2, 0], [3, 0], [4, 1]]) { H(ex + x, b + y, DOG_PAL.X); H(ex + x, b + y + 1, DOG_PAL.g); } }
+        else if (blink) { for (const [x, y] of [[0, 0], [1, 1], [2, 1], [3, 1], [4, 0]]) H(ex + x, b + y, DOG_PAL.X); }
+        else { for (let y = 0; y < eh; y++) for (let x = 0; x < 5; x++) { const ch = DOG[ey + y][ex + x]; if ('XwKi'.includes(ch)) H(ex + x + look, ey + y, DOG_PAL[ch]); }
+          // an extra glint now and then
+          if (Math.floor(m.t * 1.3 + i * 2) % 6 === 0) H(ex + 2 + look + (i ? -1 : 0), ey + 3, DOG_PAL.w); }
+      });
+      // rosy cheeks, rosier when petted
+      if (hap > 0.25) for (const [x, y] of [[18, 19], [19, 19], [20, 19], [17, 20], [18, 20], [19, 20], [20, 20], [21, 20], [18, 21], [19, 21], [20, 21], [21, 21],
+        [37, 18], [38, 18], [36, 19], [37, 19], [38, 19], [39, 19], [37, 20], [38, 20], [39, 20]]) H(x, y, '#f0897a');
+      // panting tongue when happy, a big open boof when tapped
+      if (woof) { for (const [x0, x1, y] of [[29, 31, 21], [28, 32, 22], [28, 32, 23], [28, 32, 24], [29, 31, 25]]) for (let x = x0; x <= x1; x++) H(x, y, DOG_PAL.X);
+        for (let x = 29; x <= 31; x++) H(x, 24, DOG_PAL.d); H(30, 23, DOG_PAL.d); H(29, 22, '#3b2a22'); }
+      else if (hap > 0.5) { const n = 1 + (Math.floor(T * 7) % 2); H(28, 23, DOG_PAL.X); H(32, 23, DOG_PAL.X);
+        for (let k = 1; k <= n; k++) { H(28, 23 + k, DOG_PAL.X); H(32, 23 + k, DOG_PAL.X); for (let x = 29; x <= 31; x++) H(x, 23 + k, DOG_PAL.d); H(30, 23 + k, '#c96b5c'); }
+        for (let x = 29; x <= 31; x++) H(x, 24 + n, DOG_PAL.X); }
+      return { cv, PAD };
+    },
+    draw(m) {
+      const night_ = night(), { x: dx, y: dy, by } = dog.pos(), fy = by - 52;
+      bgLayer('dog' + (night_ ? 'n' : 'd'), g => dog.paintBg(g, fy, night_));
+      // a soft rug-shadow under him
+      ellipse(97, by - 3, 62, 9, '#b0c2c7'); ellipse(97, by - 3, 54, 6, '#a3b6bd');
+      const { cv, PAD } = dog.paintDog(m);
+      ctx.imageSmoothingEnabled = false; ctx.drawImage(cv, dx - PAD * DOG_S, dy - PAD * DOG_S, cv.width * DOG_S, cv.height * DOG_S);
+      Light.begin(amb('#e8e2d6', '#b4b0c8'), 0.25);
+      Light.add(162, fy - 64, 40, 34, '#fff3d6', 0.45, 0.04); Light.add(97, by - 60, 80, 60, '#ffe2b0', 0.4, 0, 1.1); Light.add(32, fy - 76, 20, 14, '#ffd6dc', 0.3, 0.05);
+      Light.end();
+      // hearts float up off him
+      for (const h of m.hearts) { ctx.globalAlpha = Math.max(0, 1 - h.t / 1.3); const s = h.t < 0.15 ? 1 : 2;
+        DOG_HEART.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.') R(Math.round(h.x - 7 + x * s), Math.round(h.y + y * s), s, s, ch === 'H' ? '#ffd6e0' : '#ff4d6d'); })); }
+      ctx.globalAlpha = 1;
+      // a purple nitrile glove, because of course
+      if (m.hand) { const s = 2, rub = Math.sin(T * 14) > 0 ? 1 : 0, ox = Math.round(m.hand.x - 14), oy = Math.round(m.hand.y - 10 + rub);
+        HAND.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.') R(ox + x * s, oy + y * s, s, s, { K, p: '#9b7bd8', q: '#c9b2f2', P: '#7a5cc0', Q: '#e9e3f7' }[ch]); })); }
+      // the quote from just off screen
+      if (m.q) dog.drawQuote(m, dy);
+      // the sign, the bonus, and the way back
+      { const t = 'THERAPY DOG VISIT', w = Font.smallWidth(t) + 14; R(97 - w / 2 - 1, 16, w + 2, 11, K); R(97 - w / 2, 17, w, 9, '#3fa2da'); R(97 - w / 2, 17, w, 1, '#8fd0f2');
+        R(97 - w / 2 - 5, 19, 5, 7, '#2d5499'); R(97 + w / 2, 19, 5, 7, '#2d5499'); Font.smallCentered(ctx, t, 97, 19, '#fff');
+        Font.smallCentered(ctx, 'BISCUIT  -  CERTIFIED GOOD BOY', 97, 30, '#64748b'); }
+      Font.smallCentered(ctx, 'PET HIM. HE GIVES YOU +1,500 FOR THE SHIFT.', 97, by + 6, '#475569');
+      button('BACK TO WORK', 97, LH - 22, 120, '#22a35a', () => { Sound.sfx.click(); finish(true); });
+      hud(m);
+    },
+    drawQuote(m, dogTop) {
+      const q = m.q, lines = Font.wrap(q.text, 118), w = Math.max(...lines.map(l => Font.smallWidth(l))) + 10, h = lines.length * 7 + 15;
+      if (q.y == null) q.y = Math.round(rnd(42, Math.max(43, dogTop - h - 4)));
+      const a = Math.min(1, q.t / 0.25, (4.9 - q.t) / 0.35), slide = Math.round((1 - Math.min(1, q.t / 0.25)) * 30) * q.side;
+      const x = (q.side < 0 ? 6 : LW - 6 - w) + slide, y = q.y;
+      ctx.globalAlpha = Math.max(0, a);
+      R(x + 2, y + 2, w, h, 'rgba(20,24,36,.18)'); R(x - 1, y - 1, w + 2, h + 2, K); R(x, y, w, h, '#fff');
+      // the tail points off screen, at whoever is talking
+      const tx = q.side < 0 ? x - 1 : x + w + 1, ty = y + h - 10;
+      for (let k = 0; k < 4; k++) { const xx = q.side < 0 ? tx - k : tx + k; R(xx, ty + k, 1, 6 - k * 1.5, '#fff'); R(xx, ty + k - 1, 1, 1, K); R(xx, ty + k + 6 - k * 1.5, 1, 1, K); }
+      lines.forEach((l, i) => Font.small(ctx, l, x + 5, y + 4 + i * 7, '#334155'));
+      const who = '- ' + q.who.toUpperCase(); Font.small(ctx, who, x + w - 5 - Font.smallWidth(who), y + h - 8, '#94a3b8');
+      ctx.globalAlpha = 1;
+    },
+    paintBg(g, fy, nite) {
+      // a quiet corner of the unit: cream wall, mint skirting, a door with a heart on it
+      R(0, 0, LW, fy, '#f3ece2', g); for (let x = 5; x < LW; x += 12) R(x, 0, 1, fy, '#ece2d4', g);
+      R(0, fy - 7, LW, 7, '#cde7d1', g); R(0, fy - 7, LW, 1, '#e6f3e8', g); R(0, fy - 1, LW, 1, '#9ebfa8', g);
+      R(0, fy, LW, LH - fy, '#fbf7ef', g);
+      for (let k = 0, y = fy + 5; y < LH; k++, y += 5 + k * 3) R(0, y, LW, 1, '#e1eee3', g);
+      for (let i = -7; i <= 7; i++) for (let y = fy; y < LH; y++) { const t = (y - fy) / (LH - fy); R(Math.round(97 + i * 16 + i * 40 * t), y, 1, 1, '#e1eee3', g); }
+      const dx = 8, dw = 52, dh = 122, dt = fy - dh;
+      R(dx - 4, dt - 4, dw + 8, dh + 4, '#9ea7ba', g); R(dx - 3, dt - 3, dw + 6, dh + 3, '#b8c3cf', g); R(dx, dt, dw, dh, '#b0d5ce', g); R(dx + 3, dt + 3, dw - 6, dh - 3, '#bfe0d9', g);
+      R(dx + 9, dt + 10, dw - 18, 26, '#9ea7ba', g); R(dx + 10, dt + 11, dw - 20, 24, nite ? '#2b3a67' : '#e3f3f4', g); R(dx + 12, dt + 13, 4, 10, nite ? '#3b4a7a' : '#fff', g);
+      R(dx + dw - 9, dt + 70, 6, 3, '#81869e', g); R(dx + dw - 9, dt + 70, 6, 1, '#c4cad6', g);
+      // the poster: a big heart and a promise
+      { const px = dx + 9, py = dt + 42; R(px - 1, py - 1, 36, 26, '#d9cfc4', g); R(px, py, 34, 24, '#fff', g);
+        const HRT = ['.rr.rr.', 'rRrrrrr', 'rrrrrrr', '.rrrrr.', '..rrr..', '...r...'];
+        HRT.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.') R(px + 3 + x * 2, py + 3 + y * 2, 2, 2, ch === 'R' ? '#ff9aa2' : '#eb5b5f', g); }));
+        Font.small(g, 'PETS', px + 18, py + 4, '#eb5b5f'); Font.small(g, 'ARE', px + 18, py + 10, '#94a3b8'); Font.small(g, 'MEDS', px + 18, py + 16, '#3fa2da'); }
+      // a window on the other wall
+      { const wx = 128, ww = 58, wt = fy - 112, wh = 52;
+        R(wx - 3, wt - 3, ww + 6, wh + 6, '#dad0d1', g); R(wx, wt, ww, wh, nite ? '#1f2a44' : '#d9eef2', g);
+        if (nite) { disc(wx + 42, wt + 13, 5, '#fff3c4', g); disc(wx + 44, wt + 12, 4, '#1f2a44', g); for (const [sx, sy] of [[8, 9], [20, 20], [30, 7], [12, 34], [50, 32], [36, 40]]) R(wx + sx, wt + sy, 1, 1, '#e9edf2', g); }
+        else { R(wx + 8, wt + 14, 16, 5, '#fff', g); R(wx + 12, wt + 11, 8, 3, '#fff', g); R(wx + 34, wt + 30, 14, 4, '#fff', g); }
+        R(wx + ww / 2 - 1, wt, 2, wh, '#dad0d1', g); R(wx, wt + wh / 2 - 1, ww, 2, '#dad0d1', g); R(wx - 5, wt + wh + 3, ww + 10, 3, '#c9bfc0', g); }
+      // a plant that has survived three managers
+      { const px = 178, py = fy + 16;
+        for (const [lx, ly, c] of [[-9, -26, '#6d9463'], [-3, -32, '#99b866'], [3, -27, '#507b5c'], [-12, -16, '#99b866'], [5, -16, '#6d9463'], [-6, -20, '#507b5c'], [0, -22, '#99b866']]) ellipse(px + lx, py + ly, 4, 6, c, g);
+        R(px - 9, py - 12, 18, 13, K, g); R(px - 8, py - 11, 16, 11, '#e1997e', g); R(px - 10, py - 13, 20, 3, K, g); R(px - 9, py - 12, 18, 1, '#f2b49e', g); }
+      // his water bowl and a well loved toy bone
+      { const bx = 8, by2 = LH - 52; ellipse(bx + 13, by2 + 9, 15, 3, '#b0c2c7', g);
+        R(bx, by2, 26, 2, K, g); R(bx + 1, by2 + 2, 24, 4, K, g); R(bx + 3, by2 + 6, 20, 2, K, g); R(bx + 2, by2 + 2, 22, 3, '#3fa2da', g); R(bx + 4, by2 + 5, 18, 1, '#2d5499', g);
+        R(bx + 1, by2, 24, 1, '#8fd0f2', g); R(bx + 3, by2 + 1, 20, 1, '#cfeefc', g); R(bx + 6, by2 + 3, 5, 1, '#8fd0f2', g);
+        const tx = 168, ty = LH - 52; R(tx, ty + 1, 16, 3, K, g); disc(tx, ty + 1, 2, K, g); disc(tx, ty + 4, 2, K, g); disc(tx + 16, ty + 1, 2, K, g); disc(tx + 16, ty + 4, 2, K, g);
+        R(tx, ty + 2, 16, 1, '#fff', g); disc(tx, ty + 1, 1, '#fff', g); disc(tx, ty + 4, 1, '#fff', g); disc(tx + 16, ty + 1, 1, '#fff', g); disc(tx + 16, ty + 4, 1, '#fff', g); }
+      // bunting for the visit, and his photo on the wall
+      for (let x = -2; x < LW; x += 9) { const y = 40 + Math.round(Math.sin((x + 4) / LW * Math.PI) * 8), c = ['#3fa2da', '#fff', '#ff9aa2', '#ffe066'][Math.floor((x + 2) / 9) % 4];
+        R(x, y, 9, 1, '#94a3b8', g); for (let k = 0; k < 4; k++) R(x + 1 + k, y + 1 + k * 1.5, 7 - k * 2, 2, c, g); }
+      { const fx = 74, fy2 = fy - 150; if (fy2 > 54) { R(fx - 3, fy2 - 3, 48, 36, '#8a5a33', g); R(fx - 2, fy2 - 2, 46, 34, '#b98552', g); R(fx, fy2, 42, 30, '#cfe9f7', g);
+        for (const c of dogCells()) if (c.part === 'head' && c.y < 27) R(fx + c.x - 4, fy2 + 3 + c.y, 1, 1, c.col, g);
+        R(fx + 3, fy2 + 36, 36, 9, '#e3c84a', g); R(fx + 3, fy2 + 36, 36, 1, '#fff2a8', g); Font.smallCentered(g, 'BEST STAFF', fx + 21, fy2 + 38, '#7a4b00'); } }
+    },
+  };
+
+  const GAMES = { calls, cpr, meds, hangout, coffee, pizza, dog };
   const ROTATION = ['calls', 'rush', 'cpr', 'meds', 'hangout'];
 
   // ---------- framework ----------
   function begin(kind, shift, mode) {
     const g = GAMES[kind]; M = { kind, g, mode: mode || (g.isBreak ? 'break' : 'between'), shift, t: 0, score: 0, done: null, endT: 0, pops: [], lives: null };
     g.init(M); screen = 'miniIntro'; overlayT = 0;
+    if (g.noIntro) go();
   }
   // which game comes next: a shuffled bag (so you see them all), reshuffled at random each round and never the same twice in a row
   function nextGame() {
@@ -935,6 +1199,8 @@ const Minis = (() => {
     if (n < 2) return [];
     const first = 14 + Math.random() * 26, list = [{ kind: one(['coffee', 'pizza']), at: first }];
     if (Math.random() < 0.4) list.push({ kind: list[0].kind === 'coffee' ? 'pizza' : 'coffee', at: first + 25 + Math.random() * 20 });
+    // every third shift the first break is a visit from Biscuit the therapy dog
+    if (n % 3 === 0) list[0].kind = 'dog';
     return list;
   }
 

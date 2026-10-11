@@ -84,6 +84,8 @@ const Sound = (() => {
     pour()  { noise({ dur:0.12, vol:0.05, hp:2500 }); },
     ding()  { tone({ wave:'sine', f:1568, dur:0.4, vol:0.14 }); tone({ wave:'sine', f:2093, at:0.08, dur:0.4, vol:0.1 }); },
     pill(i) { tone({ wave:'triangle', f:mtof(PENT[Math.min(i, PENT.length - 1)] + 12), dur:0.06, vol:0.22 }); noise({ dur:0.02, vol:0.08, hp:5000 }); },
+    pet()   { noise({ dur:0.12, vol:0.05, hp:1800 }); },
+    happy() { tone({ wave:'triangle', f:740, f2:1180, dur:0.14, vol:0.09 }); tone({ wave:'triangle', f:880, f2:1320, at:0.16, dur:0.12, vol:0.07 }); },
     callbell(){ tone({ wave:'sine', f:880, dur:0.12, vol:0.1 }); tone({ wave:'sine', f:660, at:0.14, dur:0.14, vol:0.1 }); },
   };
 

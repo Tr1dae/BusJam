@@ -1186,7 +1186,7 @@ cv.addEventListener('pointerdown', e => {
   const p = toArt(e);
   if (screen === 'splash') { Sound.init(); Sound.play('title'); Sound.sfx.start(); startLevel(level); screen = 'card'; overlayT = 0;
     if (/[?&]rush/.test(location.search)) Rush.begin(level);  // ?rush jumps straight into an Emergency Rush for testing
-    const mini = new URLSearchParams(location.search).get('mini'); if (mini && Minis.GAMES[mini]) Minis.begin(mini, level);  // ?mini=calls|cpr|meds|hangout|coffee|pizza
+    const mini = new URLSearchParams(location.search).get('mini'); if (mini && Minis.GAMES[mini]) Minis.begin(mini, level);  // ?mini=calls|cpr|meds|hangout|coffee|pizza|dog
     return; }
   Sound.init();
   for (const b of buttons) if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { b.fn(); return; }
