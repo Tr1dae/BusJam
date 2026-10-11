@@ -464,9 +464,17 @@ const Minis = (() => {
     const text = milk === 0 ? (sugar === 0 ? 'BLACK. ALL COFFEE.' : sug + ', ALL COFFEE.') : sug + ', ' + NUM[milk] + ' MILK, ' + NUM[cof] + ' COFFEE.';
     return { sugar, milk, cof, text, who: one(NURSES), extra: one(COFFEE_EXTRA), mug: one(MUGS) };
   };
-  const COFFEE_W = 50, COFFEE_H = 76, POUR_T = 0.35;
+  const COFFEE_W = 50, COFFEE_H = 76, POUR_T = 0.25;
   const coffeeCup = () => { const ct = Math.round(LH * 0.66); return { ct, cy: ct - 8 - COFFEE_H, ph: Math.floor((COFFEE_H - 4) / 4) }; };
   const coffeeBtns = () => { const y = LH - 40, w = 58; return [{ id: 'cof', x: 6, y, w, h: 32, label: 'COFFEE', col: '#7a4a2c', hi: '#a8714a' }, { id: 'milk', x: 69, y, w, h: 32, label: 'MILK', col: '#5b8def', hi: '#8ab0ff' }, { id: 'serve', x: 132, y, w, h: 32, label: 'SERVE', col: '#22a35a', hi: '#4fd38a' }]; };
+  // little order icons: a sugar cube, a milk carton, a mug of coffee. 'none' is a crossed-out ghost (no sugar, no milk)
+  function coffeeIcon(kind, x, y, st) {
+    const ln = st === 'over' ? '#c0392b' : st === 'todo' || st === 'none' ? '#94a3b8' : K, ghost = st === 'todo' || st === 'none';
+    if (kind === 'sugar') { R(x, y + 1, 7, 7, ln); R(x + 1, y + 2, 5, 5, ghost ? '#f1f5f9' : '#e9eef5'); if (!ghost) { R(x + 1, y + 2, 5, 2, '#fff'); R(x + 5, y + 3, 1, 4, '#a9b8cc'); R(x + 1, y + 6, 5, 1, '#c3cfdc'); R(x + 2, y + 4, 1, 1, '#fff'); } }
+    else if (kind === 'milk') { R(x + 1, y, 5, 8, ln); R(x, y + 2, 7, 6, ln); R(x + 2, y + 1, 3, 1, ghost ? '#e2e8f0' : '#fff'); R(x + 1, y + 3, 5, 4, ghost ? '#f1f5f9' : '#fff'); R(x + 1, y + 4, 5, 2, ghost ? '#cbd5e1' : '#5b8def'); }
+    else { R(x, y + 1, 7, 7, ln); R(x + 1, y + 2, 5, 5, ghost ? '#f1f5f9' : '#fff'); R(x + 1, y + 3, 5, 4, ghost ? '#d6c4b4' : '#5a3520'); R(x + 7, y + 3, 2, 3, ln); R(x + 1, y + 3, 5, 1, ghost ? '#e5d7ca' : '#8a5a33'); }
+    if (st === 'none') for (let k = 0; k < 9; k++) R(x - 1 + k, y + 8 - k, 1, 1, '#e8424f');
+  }
   const coffee = {
     title: 'COFFEE RUN!', head: '#8a5a33', song: 'break', isBreak: true,
     blurb: 'The unit wants coffee, and they are specific. Tap the sugar bowl for cubes, pour coffee and milk with the buttons, then serve. Four parts fill a mug.',
@@ -477,16 +485,14 @@ const Minis = (() => {
     ],
     breakLine: m => 'ORDERS SERVED ' + m.served + (m.wrong ? '   WRONG ' + m.wrong : ''),
     init(m) { m.dur = 60; m.served = 0; m.wrong = 0; m.combo = 0; m.done_ = []; m.bowl = 0; m.say = null; coffee.next(m); },
-    next(m) { m.order = coffeeOrder(); m.parts = []; m.sugar = 0; m.pour = null; m.state = 'in'; m.st = 0; m.cubes = []; m.press = null; m.spill = 0; m.full = 0; },
+    next(m) { m.order = coffeeOrder(); m.parts = []; m.partAt = []; m.sugar = 0; m.pour = null; m.state = 'in'; m.st = 0; m.cubes = []; m.press = null; m.spill = 0; m.full = 0; },
     update(m, dt) {
       m.st += dt; m.bowl = Math.max(0, m.bowl - dt * 5); m.spill = Math.max(0, m.spill - dt); if (m.say) { m.say.t += dt; if (m.say.t > 1.4) m.say = null; }
-      if (m.state === 'in' && m.st > 0.3) { m.state = 'ready'; m.st = 0; }
-      if (m.pour) { m.pour.t += dt; if (m.pour.t >= POUR_T) { m.parts.push(m.pour.kind); m.pour = null;
-        if (m.parts.length === 4) { m.full = 1; Sound.sfx.ding(); }
-        if (m.parts.length > 4) { m.say = { text: 'CODE BROWN!', ok: false, t: 0 }; Sound.sfx.slip(); shakeScreen(0.2, 1.5); buzz(50); m.wrong++; m.combo = 0; m.state = 'out'; m.st = 0; m.spill = 1; } } }
+      if (m.state === 'in' && m.st > 0.18) { m.state = 'ready'; m.st = 0; }
+      // the stream is just for show: each tap's part is already in the mug
+      if (m.pour) { m.pour.t += dt; if (m.pour.t >= POUR_T) m.pour = null; }
       m.cubes.forEach(c => c.t += dt);
       if (m.press) { m.press.t += dt; if (m.press.t > 0.15) m.press = null; }
-      if (m.state === 'out' && m.st > 0.45) coffee.next(m);
       if (m.t >= m.dur && !m.done) end(m, 'win');
     },
     serve(m) {
@@ -496,15 +502,18 @@ const Minis = (() => {
         pop('+' + pts + (m.combo > 1 ? '  X' + m.combo : ''), 97, cy - 12, '#ffe066'); m.say = { text: one(COFFEE_YES), ok: true, t: 0 };
         Sound.sfx.bonus(); sparkle(97, cy + 20, 12, ['#ffe066', '#fff']);
       } else { m.wrong++; m.combo = 0; m.say = { text: m.parts.length < 4 ? 'HALF A CUP? REALLY?' : one(COFFEE_NO), ok: false, t: 0 }; Sound.sfx.nope(); buzz(40); shakeScreen(0.12, 1); }
-      m.state = 'out'; m.st = 0;
+      coffee.next(m);
     },
     down(m, p) {
-      if (m.state !== 'ready' || m.pour) return;
+      // every tap lands at once, so fast fingers are never held up by an animation
       const { ct } = coffeeCup();
       if (p.x < 46 && p.y > ct - 44 && p.y < ct + 8) { if (m.sugar >= 6) return; m.sugar++; m.bowl = 1; m.cubes.push({ t: 0, x: 28 + (m.sugar % 3) * 5 }); Sound.sfx.blip(900 + m.sugar * 80); return; }
       for (const b of coffeeBtns()) if (p.x >= b.x - 2 && p.x < b.x + b.w + 2 && p.y >= b.y - 6 && p.y < b.y + b.h + 4) {
         m.press = { id: b.id, t: 0 };
-        if (b.id === 'serve') coffee.serve(m); else { m.pour = { kind: b.id, t: 0 }; Sound.sfx.pour(); }
+        if (b.id === 'serve') coffee.serve(m);
+        else { m.parts.push(b.id); m.partAt.push(m.t); m.pour = { kind: b.id, t: 0 }; Sound.sfx.pour();
+          if (m.parts.length === 4) Sound.sfx.ding();
+          if (m.parts.length > 4) { m.say = { text: 'CODE BROWN!', ok: false, t: 0 }; Sound.sfx.slip(); shakeScreen(0.2, 1.5); buzz(50); m.wrong++; m.combo = 0; coffee.next(m); m.spill = 1; } }
         return; }
     },
     paintBg(g) {
@@ -560,10 +569,10 @@ const Minis = (() => {
         R(bx, by - 1, 34, 14, K); R(bx + 1, by, 32, 12, '#fff'); R(bx + 1, by, 32, 3, '#5b8def'); R(bx + 4, by + 5, 26, 1, '#dfe5ec'); R(bx + 3, by + 9, 28, 2, '#dfe5ec'); R(bx + 6, by + 13, 22, 1, K);
         if (m.state === 'ready' && m.sugar < o.sugar && Math.floor(T * 3) % 2) { R(bx + 13, by - 26, 8, 6, '#ffe066'); R(bx + 15, by - 20, 4, 3, '#ffe066'); R(bx + 16, by - 17, 2, 1, '#ffe066'); } }
       // the glass mug slides in, fills up layer by layer, then slides out
-      const slide = m.state === 'in' ? (1 - Math.min(1, m.st / 0.3)) * 140 : m.state === 'out' ? -Math.min(1, m.st / 0.45) * 140 : 0, g = o.mug;
+      const slide = m.state === 'in' ? Math.pow(1 - Math.min(1, m.st / 0.18), 2) * 140 : 0, g = o.mug;
       const cx = Math.round(97 - cw / 2 + slide);
       // what's in the mug so far, the part being poured still rising
-      const layers = m.parts.slice(0, 4).map(k => [k, 1]); if (m.pour && m.parts.length < 4) layers.push([m.pour.kind, m.pour.t / POUR_T]);
+      const layers = m.parts.slice(0, 4).map((k, i) => [k, Math.min(1, (m.t - m.partAt[i]) / 0.2)]);
       // streams from the two spouts, into the mouth of the mug
       if (m.pour) { const top = cy + 2, sx = m.pour.kind === 'cof' ? mx + 46 : mx + 59;
         R(sx, my + 54, 3, Math.max(0, top - my - 54), m.pour.kind === 'cof' ? '#5a3520' : '#f4ead8'); R(sx + 1, my + 54, 1, Math.max(0, top - my - 54), m.pour.kind === 'cof' ? '#8a5a33' : '#ffffff');
@@ -604,7 +613,7 @@ const Minis = (() => {
         Light.add(97, ct - 30, 46, 46, '#ffe2b0', 0.3, 0, 1.1); Light.add(33, ct - 61, 6, 4, '#5dff9d', 0.5, 0.15);
         Light.end(); }
       // the order ticket, with whoever is asking
-      { const tx = 6, ty = 22, tw = LW - 12, drop = m.state === 'in' ? Math.round((1 - Math.min(1, m.st / 0.3)) * -16) : 0, lines = Font.wrap(o.text, tw - 34), th = 33 + Math.max(0, lines.length - 2) * 8, t0 = ty + drop;
+      { const tx = 6, ty = 22, tw = LW - 12, drop = m.state === 'in' ? Math.round((1 - Math.min(1, m.st / 0.18)) * -16) : 0, lines = Font.wrap(o.text, tw - 34), th = 33 + Math.max(0, lines.length - 2) * 8, t0 = ty + drop;
         R(tx + 2, t0 + 2, tw, th, '#00000033'); R(tx - 1, t0 - 1, tw + 2, th + 2, K); R(tx, t0, tw, th, '#fff8dc'); R(tx, t0, tw, 9, '#8a5a33');
         for (let x = tx + 3; x < tx + tw - 3; x += 6) R(x, t0 + th - 1, 3, 1, '#e9dcb0');
         Font.small(ctx, o.who.toUpperCase() + ' WANTS:', tx + 4, t0 + 2, '#fff'); const sv = 'SERVED ' + m.served; Font.small(ctx, sv, tx + tw - 4 - Font.smallWidth(sv), t0 + 2, '#ffe066');
@@ -613,13 +622,16 @@ const Minis = (() => {
         lines.forEach((l, i) => Font.small(ctx, l, tx + 28, t0 + 13 + i * 8, '#334155'));
         if (lines.length < 2) Font.small(ctx, o.extra, tx + 28, t0 + 21, '#94a3b8');
         // what's in the mug against the order
-        const have = [['SUGAR', m.sugar, o.sugar], ['MILK', m.parts.filter(k => k === 'milk').length, o.milk], ['COFFEE', m.parts.filter(k => k === 'cof').length, o.cof]];
-        have.forEach(([n, h, w], i) => { const x = tx + 1 + i * 62, yy = t0 + th + 3, okk = h === w, over = h > w, lbl = n + ' ' + h + '/' + w;
-          badge(x, yy, 58, 9, okk ? '#c9ffd9' : over ? '#ffd6dc' : '#fff'); Font.small(ctx, lbl, x + 29 - Math.floor(Font.smallWidth(lbl) / 2), yy + 1, okk ? '#22a35a' : over ? '#c0392b' : '#475569'); }); }
+        // the order as icons, readable at a glance: solid once it's in, ghosted while still to do, red when it's one too many
+        const have = [['sugar', m.sugar, o.sugar], ['milk', m.parts.filter(k => k === 'milk').length, o.milk], ['cof', m.parts.filter(k => k === 'cof').length, o.cof]];
+        have.forEach(([n, h, w], i) => { const x = tx + 1 + i * 62, yy = t0 + th + 3, okk = h === w, over = h > w, k = Math.max(w, h, 1), sp = n === 'sugar' ? 9 : 10, ix = Math.round(x + 29 - (k * sp - 3) / 2);
+          badge(x, yy, 58, 12, okk ? '#c9ffd9' : over ? '#ffd6dc' : '#fff');
+          for (let j = 0; j < k; j++) coffeeIcon(n, ix + j * sp, yy + 2, j >= w ? (j < h ? 'over' : 'none') : j < h ? 'in' : 'todo');
+          if (okk) { R(x + 52, yy + 5, 1, 2, '#22a35a'); R(x + 53, yy + 6, 1, 2, '#22a35a'); R(x + 54, yy + 4, 1, 3, '#22a35a'); } }); }
       // their verdict
       if (m.say) { const a = m.say.t < 1.1 ? 1 : (1.4 - m.say.t) / 0.3; ctx.globalAlpha = Math.max(0, a); bubble(m.say.text, 97, cy - 34, m.say.ok ? '#fff' : '#e8424f', m.say.ok ? '#2e8a5f' : '#fff', 4, LW - 4); ctx.globalAlpha = 1; }
       // buttons along the bottom, with icons
-      for (const b of coffeeBtns()) { const dn = m.press && m.press.id === b.id ? 2 : 0, off = m.state !== 'ready' || m.pour, warn = b.id !== 'serve' && m.parts.length >= 4, col = off ? '#64748b' : warn ? '#9c6a3e' : b.col;
+      for (const b of coffeeBtns()) { const dn = m.press && m.press.id === b.id ? 2 : 0, off = false, warn = b.id !== 'serve' && m.parts.length >= 4, col = off ? '#64748b' : warn ? '#9c6a3e' : b.col;
         R(b.x - 1, b.y - 1 + dn, b.w + 2, b.h + 2 - dn, K); R(b.x, b.y + dn, b.w, b.h - dn, col); R(b.x, b.y + b.h - 4, b.w, 4, '#00000033'); R(b.x, b.y + dn, b.w, 1, off ? '#7d8ca1' : b.hi);
         const ix = b.x + b.w / 2, iy = b.y + 6 + dn;
         if (b.id === 'cof') { R(ix - 5, iy, 10, 9, K); R(ix - 4, iy + 1, 8, 7, '#fff'); R(ix - 4, iy + 3, 8, 5, '#5a3520'); R(ix + 4, iy + 2, 3, 4, K); }
@@ -979,7 +991,7 @@ const Minis = (() => {
       m.leanT += dt; if (m.leanT > 0.07 && m.lean !== want) { m.lean += Math.sign(want - m.lean); m.leanT = 0; }
       m.hearts.forEach(h => { h.t += dt; h.y -= dt * (16 + h.t * 10); h.x += Math.sin(h.t * 5 + h.ph) * dt * 8; }); m.hearts = m.hearts.filter(h => h.t < 1.3);
       // someone just off screen always has something to say to him
-      if (m.t > m.nextQ) { m.side = -m.side; m.q = { text: m.quotes[m.qi % m.quotes.length], who: one(NURSES), side: m.side, t: 0, y: null }; m.qi++; m.nextQ = m.t + 5.2; }
+      if (m.t > m.nextQ) { m.side = -m.side; m.q = { text: m.quotes[m.qi % m.quotes.length], who: one(NURSES), side: m.side, t: 0, y: null }; m.qi++; m.nextQ = m.t + 8.6; }
       if (m.q) { m.q.t += dt; if (m.q.t > 4.9) m.q = null; }
     },
     down(m, p) { const c = dog.cellAt(p); if (!c.on) return; m.hand = { x: p.x, y: p.y }; m.downAt = m.t; m.moved = 0; m.down = c; },
